@@ -33,11 +33,11 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center py-12 px-4">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#f7f1eb] via-white to-[#f8efe6] dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 flex items-center justify-center py-12 px-4">
+      <div className="max-w-md w-full space-y-8 rounded-2xl border border-[#eadfce] bg-white/95 dark:bg-gray-900/85 p-8 shadow-[0_24px_60px_rgba(31,36,48,0.15)]">
         <div className="text-center">
           <h2 className="text-4xl font-bold text-black dark:text-white mb-2">Login to Glossy Store</h2>
-          <p className="text-gray-600 dark:text-gray-400">Enter your details below</p>
+          <p className="text-gray-600 dark:text-gray-300">Welcome back to your premium account.</p>
         </div>
 
         <form onSubmit={handleLogin} className="mt-8 space-y-6">
@@ -49,7 +49,7 @@ export function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email"
-                className="w-full px-0 py-3 border-b-2 border-gray-300 dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-red-500 outline-none"
+                className="w-full px-0 py-3 border-b-2 border-[#d8cdbf] dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-[#b42318] outline-none"
               />
             </div>
             <div>
@@ -59,13 +59,13 @@ export function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
-                className="w-full px-0 py-3 border-b-2 border-gray-300 dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-red-500 outline-none"
+                className="w-full px-0 py-3 border-b-2 border-[#d8cdbf] dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-[#b42318] outline-none"
               />
             </div>
           </div>
 
           <div className="flex items-center justify-between">
-            <Link to="/forgot-password" className="text-sm text-red-500 hover:underline">
+            <Link to="/forgot-password" className="text-sm text-[#b42318] hover:underline">
               Forgot Password?
             </Link>
           </div>
@@ -73,7 +73,7 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-red-500 text-white py-3 rounded hover:bg-red-600 transition-colors disabled:opacity-50 font-semibold"
+            className="w-full bg-[#b42318] text-white py-3 rounded hover:bg-[#8f1b12] transition-colors disabled:opacity-50 font-semibold"
           >
             {loading ? 'Logging in...' : 'Log In'}
           </button>
@@ -81,7 +81,7 @@ export function LoginPage() {
           <div className="text-center">
             <p className="text-gray-600 dark:text-gray-400">
               Don't have an account?{' '}
-              <Link to="/register" className="text-red-500 hover:underline font-semibold">
+              <Link to="/register" className="text-[#b42318] hover:underline font-semibold">
                 Sign Up
               </Link>
             </p>

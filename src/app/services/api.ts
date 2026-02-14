@@ -1,5 +1,6 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
 const STORAGE_KEY = 'user';
+const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
 
 type ApiRequestOptions = RequestInit & {
   requireAuth?: boolean;
@@ -8,6 +9,7 @@ type ApiRequestOptions = RequestInit & {
 type ApiErrorPayload = {
   error?: string;
   message?: string;
+  requestId?: string;
 };
 
 const safeParse = <T>(value: string | null): T | null => {
@@ -36,27 +38,68 @@ const getDefaultHeaders = (requireAuth: boolean, includeJsonContentType: boolean
   return headers;
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const dispatchUnauthorized = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('auth:unauthorized'));
+  }
+};
+
 async function apiCall<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
   const { requireAuth = false, ...requestOptions } = options;
   const includeJsonContentType = !(requestOptions.body instanceof FormData);
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...requestOptions,
-    headers: {
-      ...getDefaultHeaders(requireAuth, includeJsonContentType),
-      ...(requestOptions.headers || {}),
-    },
-  });
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const method = (requestOptions.method || 'GET').toUpperCase();
+  const shouldRetry = method === 'GET';
+  const maxAttempts = shouldRetry ? 2 : 1;
 
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({} as ApiErrorPayload));
-    const message = payload.error || payload.message || `Request failed (${response.status})`;
-    throw new Error(message);
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(`${API_BASE_URL}${normalizedEndpoint}`, {
+        ...requestOptions,
+        credentials: 'same-origin',
+        signal: controller.signal,
+        headers: {
+          ...getDefaultHeaders(requireAuth, includeJsonContentType),
+          ...(requestOptions.headers || {}),
+        },
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({} as ApiErrorPayload));
+        const message = payload.error || payload.message || `Request failed (${response.status})`;
+        const formattedMessage = payload.requestId ? `${message} (ref: ${payload.requestId})` : message;
+        if (response.status === 401 && requireAuth) {
+          dispatchUnauthorized();
+        }
+        throw new Error(formattedMessage);
+      }
+
+      if (response.status === 204) {
+        return undefined as T;
+      }
+      return response.json() as Promise<T>;
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        lastError = new Error('Request timed out. Please try again.');
+      } else {
+        lastError = error instanceof Error ? error : new Error('Network request failed');
+      }
+      if (attempt < maxAttempts) {
+        await sleep(350);
+        continue;
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
-  return response.json() as Promise<T>;
+  throw lastError || new Error('Request failed');
 }
 
 export type AuthUser = {

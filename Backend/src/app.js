@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const path = require('path');
 const rateLimit = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
+const requestLogger = require('./middleware/requestLogger');
 const routes = require('./routes');
 const sequelize = require('./config/database');
 const passport = require('./config/passport');
@@ -37,15 +38,31 @@ const trustProxy = (() => {
 // Middleware
 app.use(helmet({
   hsts: isProduction ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: isProduction ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+  } : false,
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  referrerPolicy: { policy: 'no-referrer' },
 }));
 app.set('trust proxy', trustProxy);
 app.disable('x-powered-by');
 app.use(cors({
   origin: corsOrigin,
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type', 'X-Requested-With'],
 }));
+app.use(requestLogger);
 app.use(express.json({
   limit: process.env.JSON_BODY_LIMIT || '1mb',
   verify: (req, res, buf) => {
@@ -75,6 +92,10 @@ app.get('/api/info', (req, res) => {
 // Routes
 app.use('/api', routes);
 mountSwagger(app);
+
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
 
 // Error handling
 app.use(errorHandler);

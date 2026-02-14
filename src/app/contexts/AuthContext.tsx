@@ -61,6 +61,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setUser(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('cart');
+    };
+    window.addEventListener('auth:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', onUnauthorized);
+  }, []);
+
   const register = async (name: string, email: string, password: string) => {
     await api.register({ name, email, password });
   };
