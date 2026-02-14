@@ -11,10 +11,19 @@ Portfolio: `https://oyinlola.site`
 
 - Full auth flow: register, login, OTP verification, forgot/reset password
 - Dedicated OTP page (`/otp`) with resend support
+- Mandatory OTP for every `admin` and `superadmin` login attempt
 - Product catalog, categories, cart, checkout, wishlist, orders
 - Admin and SuperAdmin dashboards with role-based access
 - Support chat with private attachment handling
 - Automatic database bootstrap on backend startup
+
+## License and Usage
+
+- This project is proprietary software.
+- It is not free to use.
+- You must contact and obtain written permission before any use.
+- Contact for licensing: `https://oyinlola.site`
+- See `LICENSE.md` for full legal terms.
 
 ## Quick Start
 
@@ -88,7 +97,8 @@ Backend:
 ## OTP Flow
 
 - Registration sends OTP and redirects to `/otp?purpose=registration&email=...`
-- Suspicious/new-device login sends OTP and redirects to `/otp?purpose=login&email=...`
+- Every `admin` and `superadmin` login requires OTP and redirects to `/otp?purpose=login&email=...`
+- Standard user logins require OTP on suspicious/new-device sign-in
 - OTP page verifies and supports resend via `/api/auth/resend-otp`
 
 ## Security Notes
