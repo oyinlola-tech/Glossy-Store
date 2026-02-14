@@ -11,6 +11,7 @@ const toPrice = (product: api.Product) =>
 
 export function HomePage() {
   const [products, setProducts] = useState<api.Product[]>([]);
+  const [categories, setCategories] = useState<api.Category[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -19,7 +20,9 @@ export function HomePage() {
     const loadData = async () => {
       try {
         const result = await api.getProducts({ limit: 12 });
+        const categoryResult = await api.getCategories({ tree: true });
         setProducts(result.products || []);
+        setCategories(categoryResult.categories || []);
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
@@ -82,6 +85,32 @@ export function HomePage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="container mx-auto px-4 mb-16">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-5 h-10 bg-red-500 rounded"></div>
+              <h2 className="text-red-500 font-semibold">Categories</h2>
+            </div>
+            <h3 className="text-3xl font-bold text-black dark:text-white">Browse By Category</h3>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-14">
+          {categories.slice(0, 6).map((category) => (
+            <Link
+              key={category.id}
+              to={`/products?category=${category.id}`}
+              className="aspect-square border-2 border-gray-200 dark:border-gray-700 rounded p-3 hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors group flex flex-col justify-between"
+            >
+              <p className="text-sm font-semibold text-black dark:text-white group-hover:text-white">{category.name}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-red-100">
+                {category.subcategories?.length || 0} subcategories
+              </p>
+            </Link>
+          ))}
         </div>
       </section>
 

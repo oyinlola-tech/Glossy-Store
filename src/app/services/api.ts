@@ -92,6 +92,14 @@ export type Product = {
   }>;
 };
 
+export type Category = {
+  id: number;
+  name: string;
+  description?: string;
+  parent_id?: number | null;
+  subcategories?: Category[];
+};
+
 export type CartItemView = {
   id: number;
   quantity: number;
@@ -107,6 +115,32 @@ export type CartView = {
   id?: number;
   items: CartItemView[];
   subtotal: number;
+};
+
+export type DiscountPreviewResponse = {
+  welcome_discount_eligible: boolean;
+  welcome_discount_amount: number;
+  welcome_discount_message: string;
+  applies_to: null | {
+    product_variant_id: number;
+    product_name: string;
+    quantity_affected: number;
+    discount_rate: number;
+  };
+};
+
+export type CheckoutResponse = {
+  order: any;
+  payment: any;
+  welcome_discount_applied: boolean;
+  welcome_discount_amount: number;
+  welcome_discount_message: string | null;
+  welcome_discount_target: null | {
+    product_variant_id: number;
+    product_name: string;
+    quantity_affected: number;
+    discount_rate: number;
+  };
 };
 
 const toNumber = (value: unknown, fallback = 0) => {
@@ -254,6 +288,11 @@ export const getProducts = (params?: {
 };
 
 export const getProduct = (id: number | string) => apiCall<Product>(`/products/${id}`);
+export const getCategories = (params?: { tree?: boolean }) => {
+  const search = new URLSearchParams();
+  if (typeof params?.tree === 'boolean') search.set('tree', String(params.tree));
+  return apiCall<{ categories: Category[] }>(`/categories${search.toString() ? `?${search.toString()}` : ''}`);
+};
 export const rateProduct = (id: number | string, rating: number, review?: string) =>
   apiCall(`/products/${id}/rate`, {
     method: 'POST',
@@ -289,10 +328,15 @@ export const deleteCartItem = (itemId: number | string) =>
 
 // Orders
 export const checkout = (data: { shippingAddress: string; couponCode?: string }) =>
-  apiCall('/orders/checkout', {
+  apiCall<CheckoutResponse>('/orders/checkout', {
     method: 'POST',
     requireAuth: true,
     body: JSON.stringify(data),
+  });
+
+export const getCheckoutDiscountPreview = () =>
+  apiCall<DiscountPreviewResponse>('/orders/discount-preview', {
+    requireAuth: true,
   });
 
 export const getOrders = () => apiCall('/orders', { requireAuth: true });

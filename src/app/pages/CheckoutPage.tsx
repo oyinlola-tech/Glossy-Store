@@ -11,6 +11,7 @@ export function CheckoutPage() {
   const state = (location.state || {}) as CheckoutState;
   const [loading, setLoading] = useState(false);
   const [cart, setCart] = useState<api.CartView>({ items: [], subtotal: 0 });
+  const [discountPreview, setDiscountPreview] = useState<api.DiscountPreviewResponse | null>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -24,9 +25,14 @@ export function CheckoutPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [cartRaw, profile] = await Promise.all([api.getCart(), api.getUserProfile()]);
+        const [cartRaw, profile, preview] = await Promise.all([
+          api.getCart(),
+          api.getUserProfile(),
+          api.getCheckoutDiscountPreview(),
+        ]);
         const mapped = api.mapCartResponse(cartRaw);
         setCart(mapped);
+        setDiscountPreview(preview);
         setFormData((prev) => ({
           ...prev,
           firstName: String(profile?.name || '').split(' ')[0] || '',
@@ -42,7 +48,12 @@ export function CheckoutPage() {
   }, [navigate]);
 
   const shipping = useMemo(() => (cart.subtotal > 100 ? 0 : 10), [cart.subtotal]);
-  const total = useMemo(() => cart.subtotal + shipping, [cart.subtotal, shipping]);
+  const welcomeDiscount = useMemo(() => {
+    if (!discountPreview?.welcome_discount_eligible) return 0;
+    if (state.couponCode) return 0;
+    return Number(discountPreview.welcome_discount_amount || 0);
+  }, [discountPreview, state.couponCode]);
+  const total = useMemo(() => Math.max(0, cart.subtotal + shipping - welcomeDiscount), [cart.subtotal, shipping, welcomeDiscount]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,11 +75,14 @@ export function CheckoutPage() {
         .filter(Boolean)
         .join(', ');
 
-      await api.checkout({
+      const checkoutResponse = await api.checkout({
         shippingAddress,
         couponCode: state.couponCode,
       });
 
+      if (checkoutResponse.welcome_discount_applied) {
+        toast.success(checkoutResponse.welcome_discount_message || '10% first-order discount applied');
+      }
       toast.success('Order placed successfully');
       navigate('/orders');
     } catch (error: any) {
@@ -130,6 +144,17 @@ export function CheckoutPage() {
           <div>
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 sticky top-4">
               <h3 className="text-xl font-bold text-black dark:text-white mb-4">Order Summary</h3>
+              {discountPreview?.welcome_discount_eligible && !state.couponCode ? (
+                <div className="mb-4 rounded-md border border-green-500/40 bg-green-50 dark:bg-green-900/20 p-3 text-sm text-green-800 dark:text-green-200">
+                  <p className="font-semibold">10% first-order discount applied</p>
+                  <p>
+                    Applies to one unit of{' '}
+                    <span className="font-semibold">
+                      {discountPreview.applies_to?.product_name || 'a product'}
+                    </span>.
+                  </p>
+                </div>
+              ) : null}
               <div className="space-y-3 mb-6">
                 {cart.items.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
@@ -147,6 +172,12 @@ export function CheckoutPage() {
                   <span className="text-gray-600 dark:text-gray-400">Shipping:</span>
                   <span className="text-black dark:text-white">{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
                 </div>
+                {welcomeDiscount > 0 ? (
+                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">Welcome discount:</span>
+                    <span className="text-green-600 dark:text-green-300">-${welcomeDiscount.toFixed(2)}</span>
+                  </div>
+                ) : null}
                 <div className="flex justify-between py-2">
                   <span className="text-black dark:text-white font-semibold">Total:</span>
                   <span className="text-black dark:text-white font-semibold">${total.toFixed(2)}</span>

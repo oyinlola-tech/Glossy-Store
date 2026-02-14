@@ -20,7 +20,13 @@ const socketCorsOrigin = (origin, callback) => {
 
 const startServer = async () => {
   try {
-    await initializeDatabase();
+    const allowStartWithoutDb = String(process.env.ALLOW_START_WITHOUT_DB || '').toLowerCase() === 'true';
+    try {
+      await initializeDatabase();
+    } catch (dbErr) {
+      if (!allowStartWithoutDb) throw dbErr;
+      console.error('Database initialization failed. Starting in limited mode:', dbErr.message);
+    }
     const server = http.createServer(app);
     const io = new Server(server, {
       cors: {

@@ -11,6 +11,7 @@ const contactRoutes = require('./contactRoutes');
 const paymentRoutes = require('./paymentRoutes');
 const couponRoutes = require('./couponRoutes');
 const supportRoutes = require('./supportRoutes');
+const categoryRoutes = require('./categoryRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/user', userRoutes);
@@ -22,5 +23,6 @@ router.use('/contact', contactRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/coupons', couponRoutes);
 router.use('/support', supportRoutes);
+router.use('/categories', categoryRoutes);
 
 module.exports = router;

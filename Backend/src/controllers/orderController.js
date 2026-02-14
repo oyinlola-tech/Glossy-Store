@@ -19,6 +19,79 @@ const refreshProductStock = async (productId, transaction) => {
   await Product.update({ stock: totalStock }, { where: { id: productId }, transaction });
 };
 
+const computeWelcomeDiscount = async ({ userId, cartItems, transaction }) => {
+  if (!cartItems?.length) {
+    return { eligible: false, amount: 0, applies_to: null, reason: 'cart_empty' };
+  }
+
+  const existingOrderCount = await Order.count({
+    where: { user_id: userId },
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+  if (existingOrderCount > 0) {
+    return { eligible: false, amount: 0, applies_to: null, reason: 'not_first_order' };
+  }
+
+  const firstItem = cartItems[0];
+  const firstVariant = await ProductVariant.findByPk(firstItem.product_variant_id, {
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+    include: [{ model: Product }],
+  });
+  if (!firstVariant) {
+    return { eligible: false, amount: 0, applies_to: null, reason: 'variant_not_found' };
+  }
+
+  const unitPrice = calculateItemPrice(firstVariant);
+  const amount = Number(((unitPrice * 10) / 100).toFixed(2));
+  return {
+    eligible: amount > 0,
+    amount,
+    applies_to: {
+      product_variant_id: firstVariant.id,
+      product_name: firstVariant.Product?.name || 'Product',
+      quantity_affected: 1,
+      discount_rate: 10,
+    },
+    reason: amount > 0 ? 'eligible' : 'invalid_price',
+  };
+};
+
+exports.getDiscountPreview = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const cart = await Cart.findOne({
+      where: { user_id: userId },
+      include: [{ model: CartItem }],
+    });
+
+    if (!cart || cart.CartItems.length === 0) {
+      return res.json({
+        welcome_discount_eligible: false,
+        welcome_discount_amount: 0,
+        welcome_discount_message: 'Add items to cart to see discount preview',
+        applies_to: null,
+      });
+    }
+
+    const preview = await sequelize.transaction(async (transaction) => (
+      computeWelcomeDiscount({ userId, cartItems: cart.CartItems, transaction })
+    ));
+
+    return res.json({
+      welcome_discount_eligible: preview.eligible,
+      welcome_discount_amount: preview.amount,
+      welcome_discount_message: preview.eligible
+        ? '10% first-order discount applies to one product unit'
+        : 'No first-order discount available',
+      applies_to: preview.applies_to,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 exports.checkout = async (req, res, next) => {
   try {
     const { shippingAddress, couponCode } = req.body;
@@ -39,9 +112,11 @@ exports.checkout = async (req, res, next) => {
     const checkoutResult = await sequelize.transaction(async (transaction) => {
       let subtotal = 0;
       const stockTouchedProductIds = new Set();
+      let firstItemUnitPrice = 0;
 
       const lockedVariants = {};
-      for (const item of cart.CartItems) {
+      for (let index = 0; index < cart.CartItems.length; index += 1) {
+        const item = cart.CartItems[index];
         const lockedVariant = await ProductVariant.findByPk(item.product_variant_id, {
           transaction,
           lock: transaction.LOCK.UPDATE,
@@ -55,11 +130,19 @@ exports.checkout = async (req, res, next) => {
           throw new Error(`Insufficient stock for ${lockedVariant.Product.name}. Available: ${available}`);
         }
         lockedVariants[item.product_variant_id] = lockedVariant;
-        subtotal += calculateItemPrice(lockedVariant) * Number(item.quantity);
+        const unitPrice = calculateItemPrice(lockedVariant);
+        if (index === 0) {
+          firstItemUnitPrice = unitPrice;
+        }
+        subtotal += unitPrice * Number(item.quantity);
       }
 
       let discount = 0;
       let coupon = null;
+      let welcomeDiscountApplied = false;
+      let welcomeDiscountAmount = 0;
+      let welcomeDiscountTarget = null;
+
       if (couponCode) {
         coupon = await Coupon.findOne({
           where: {
@@ -80,6 +163,19 @@ exports.checkout = async (req, res, next) => {
           discount = Math.min(discount, subtotal);
           coupon.used_count = Number(coupon.used_count || 0) + 1;
           await coupon.save({ transaction });
+        }
+      } else {
+        const preview = await computeWelcomeDiscount({
+          userId,
+          cartItems: cart.CartItems,
+          transaction,
+        });
+        if (preview.eligible && firstItemUnitPrice > 0) {
+          // One-time 10% off for new users, applied to exactly one product unit.
+          discount = Math.min(preview.amount, subtotal);
+          welcomeDiscountApplied = discount > 0;
+          welcomeDiscountAmount = discount;
+          welcomeDiscountTarget = preview.applies_to;
         }
       }
 
@@ -118,7 +214,16 @@ exports.checkout = async (req, res, next) => {
       }
 
       await CartItem.destroy({ where: { cart_id: cart.id }, transaction });
-      return { order: newOrder, total };
+      return {
+        order: newOrder,
+        total,
+        welcome_discount_applied: welcomeDiscountApplied,
+        welcome_discount_amount: welcomeDiscountAmount,
+        welcome_discount_message: welcomeDiscountApplied
+          ? '10% first-order discount applied to one product unit'
+          : null,
+        welcome_discount_target: welcomeDiscountTarget,
+      };
     });
 
     // Initialize payment
@@ -133,6 +238,10 @@ exports.checkout = async (req, res, next) => {
     res.json({
       order: checkoutResult.order,
       payment: paymentData,
+      welcome_discount_applied: checkoutResult.welcome_discount_applied,
+      welcome_discount_amount: checkoutResult.welcome_discount_amount,
+      welcome_discount_message: checkoutResult.welcome_discount_message,
+      welcome_discount_target: checkoutResult.welcome_discount_target,
     });
   } catch (err) {
     if (String(err.message).startsWith('Insufficient stock')) {

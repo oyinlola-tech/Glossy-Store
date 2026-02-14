@@ -15,7 +15,14 @@ import { ProductsPage } from './pages/ProductsPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { WishlistPage } from './pages/WishlistPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { AdminCategoriesPage } from './pages/admin/AdminCategoriesPage';
+import { AdminOrdersPage } from './pages/admin/AdminOrdersPage';
+import { AdminProductsPage } from './pages/admin/AdminProductsPage';
+import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+import { SuperAdminAdminsPage } from './pages/superadmin/SuperAdminAdminsPage';
 import { SuperAdminDashboard } from './pages/superadmin/SuperAdminDashboard';
+import { SuperAdminSettingsPage } from './pages/superadmin/SuperAdminSettingsPage';
+import { SuperAdminUsersPage } from './pages/superadmin/SuperAdminUsersPage';
 
 function MainLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -52,6 +59,17 @@ function AboutPage() {
           Glossy Store is a modern ecommerce experience focused on quality products and reliable fulfillment.
           This frontend is now wired to the backend API for authentication, catalog browsing, cart, checkout, and account operations.
         </p>
+      </div>
+    </MainLayout>
+  );
+}
+
+function StaticInfoPage({ title, content }: { title: string; content: string }) {
+  return (
+    <MainLayout>
+      <div className="container mx-auto px-4 py-10">
+        <h1 className="text-3xl font-bold text-black dark:text-white mb-4">{title}</h1>
+        <p className="text-gray-700 dark:text-gray-300 max-w-3xl">{content}</p>
       </div>
     </MainLayout>
   );
@@ -98,6 +116,18 @@ export const router = createBrowserRouter([
   { path: '/contact', element: <MainLayout><ContactPage /></MainLayout> },
   { path: '/about', element: <AboutPage /> },
   {
+    path: '/privacy',
+    element: <StaticInfoPage title="Privacy Policy" content="We process account and order data to deliver services securely. Contact support for privacy requests." />,
+  },
+  {
+    path: '/terms',
+    element: <StaticInfoPage title="Terms of Use" content="Using this platform means agreeing to applicable policies, lawful use, and payment/refund terms." />,
+  },
+  {
+    path: '/faq',
+    element: <StaticInfoPage title="FAQ" content="For product, shipping, payment, and account questions, contact support through the contact page." />,
+  },
+  {
     path: '/admin/dashboard',
     element: (
       <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
@@ -106,10 +136,66 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/admin/products',
+    element: (
+      <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+        <MainLayout><AdminProductsPage /></MainLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/admin/categories',
+    element: (
+      <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+        <MainLayout><AdminCategoriesPage /></MainLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/admin/orders',
+    element: (
+      <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+        <MainLayout><AdminOrdersPage /></MainLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/admin/users',
+    element: (
+      <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+        <MainLayout><AdminUsersPage /></MainLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: '/superadmin/dashboard',
     element: (
       <ProtectedRoute allowedRoles={['superadmin']}>
         <MainLayout><SuperAdminDashboard /></MainLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/superadmin/admins',
+    element: (
+      <ProtectedRoute allowedRoles={['superadmin']}>
+        <MainLayout><SuperAdminAdminsPage /></MainLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/superadmin/users',
+    element: (
+      <ProtectedRoute allowedRoles={['superadmin']}>
+        <MainLayout><SuperAdminUsersPage /></MainLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/superadmin/settings',
+    element: (
+      <ProtectedRoute allowedRoles={['superadmin']}>
+        <MainLayout><SuperAdminSettingsPage /></MainLayout>
       </ProtectedRoute>
     ),
   },

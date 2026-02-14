@@ -16,12 +16,25 @@ export function ProductsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [sortBy, setSortBy] = useState<SortOption>('featured');
+  const [categories, setCategories] = useState<api.Category[]>([]);
   const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     void loadProducts();
   }, [searchParams]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const response = await api.getCategories({ tree: true });
+        setCategories(response.categories || []);
+      } catch {
+        setCategories([]);
+      }
+    };
+    void loadCategories();
+  }, []);
 
   const loadProducts = async () => {
     setLoading(true);
@@ -30,6 +43,7 @@ export function ProductsPage() {
       const response = await api.getProducts({
         page,
         limit: 12,
+        category: searchParams.get('category') || undefined,
       });
       setProducts(response.products || []);
       setCurrentPage(response.page || 1);
@@ -58,6 +72,14 @@ export function ProductsPage() {
   const handlePageChange = (page: number) => {
     const next = new URLSearchParams(searchParams);
     next.set('page', String(page));
+    setSearchParams(next);
+  };
+
+  const handleCategoryChange = (categoryId: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (categoryId) next.set('category', categoryId);
+    else next.delete('category');
+    next.set('page', '1');
     setSearchParams(next);
   };
 
@@ -109,16 +131,28 @@ export function ProductsPage() {
           <h1 className="text-3xl font-bold text-black dark:text-white">
             {searchParams.get('search') ? `Search: "${searchParams.get('search')}"` : 'All Products'}
           </h1>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-black dark:text-white"
-          >
-            <option value="featured">Sort: Featured</option>
-            <option value="price_asc">Price: Low to High</option>
-            <option value="price_desc">Price: High to Low</option>
-            <option value="name_asc">Name: A-Z</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={searchParams.get('category') || ''}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-black dark:text-white"
+            >
+              <option value="">All Categories</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>{category.name}</option>
+              ))}
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-black dark:text-white"
+            >
+              <option value="featured">Sort: Featured</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="name_asc">Name: A-Z</option>
+            </select>
+          </div>
         </div>
 
         {filteredProducts.length > 0 ? (
