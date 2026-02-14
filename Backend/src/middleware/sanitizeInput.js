@@ -35,6 +35,9 @@ const sanitizeInput = (req, res, next) => {
   if (req.query && typeof req.query === 'object') {
     Object.assign(req.query, sanitizeValue(req.query));
   }
+  if (req.params && typeof req.params === 'object') {
+    Object.assign(req.params, sanitizeValue(req.params));
+  }
   next();
 };
 

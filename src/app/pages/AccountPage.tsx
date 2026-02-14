@@ -24,6 +24,10 @@ export function AccountPage() {
   }, []);
 
   const save = async () => {
+    if (!name.trim()) {
+      toast.error('Name is required');
+      return;
+    }
     setSaving(true);
     try {
       const response = await api.updateUserProfile({ name: name.trim() });

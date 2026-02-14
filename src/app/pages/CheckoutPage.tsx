@@ -66,6 +66,9 @@ export function CheckoutPage() {
 
     setLoading(true);
     try {
+      if (!/\S+@\S+\.\S+/.test(formData.email.trim())) {
+        throw new Error('Enter a valid email address');
+      }
       const shippingAddress = [
         `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim(),
         formData.address.trim(),
@@ -75,6 +78,9 @@ export function CheckoutPage() {
       ]
         .filter(Boolean)
         .join(', ');
+      if (shippingAddress.length < 10) {
+        throw new Error('Shipping details are incomplete');
+      }
 
       const checkoutResponse = await api.checkout({
         shippingAddress,

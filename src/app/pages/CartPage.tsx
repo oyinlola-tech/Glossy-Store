@@ -237,7 +237,7 @@ export function CartPage() {
                     <span className="text-black dark:text-white font-semibold">${total.toFixed(2)}</span>
                   </div>
                 </div>
-                <button onClick={handleCheckout} className="w-full mt-6 bg-red-500 text-white py-3 rounded hover:bg-red-600 font-semibold">
+                <button onClick={handleCheckout} disabled={!cart.items.length} className="w-full mt-6 bg-red-500 text-white py-3 rounded hover:bg-red-600 font-semibold disabled:opacity-50">
                   Proceed to Checkout
                 </button>
               </div>
