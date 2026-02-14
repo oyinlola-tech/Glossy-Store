@@ -198,6 +198,12 @@ export const verifyOTP = (data: { email: string; otp: string; purpose: 'registra
     body: JSON.stringify(data),
   });
 
+export const resendOTP = (data: { email: string; purpose: 'registration' | 'login' | 'forgot_password' }) =>
+  apiCall<{ message: string }>('/auth/resend-otp', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
 export const login = (data: { email: string; password: string }) =>
   apiCall<LoginResponse>('/auth/login', {
     method: 'POST',
@@ -471,4 +477,16 @@ export const updateSupportConversationStatus = (id: number | string, status: 'op
     method: 'PATCH',
     requireAuth: true,
     body: JSON.stringify({ status }),
+  });
+
+export const clearSupportConversationMessages = (id: number | string) =>
+  apiCall(`/support/conversations/${id}/messages`, {
+    method: 'DELETE',
+    requireAuth: true,
+  });
+
+export const deleteSupportConversation = (id: number | string) =>
+  apiCall(`/support/conversations/${id}`, {
+    method: 'DELETE',
+    requireAuth: true,
   });

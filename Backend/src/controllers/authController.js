@@ -5,6 +5,7 @@ const {
   verifyOTPSchema,
   verifyLoginOTPSchema,
   forgotPasswordSchema,
+  resendOTPSchema,
   resetPasswordSchema,
   changePasswordSchema,
   confirmDeleteAccountSchema,
@@ -162,6 +163,38 @@ exports.forgotPassword = async (req, res, next) => {
 
     await createOTP(email, 'forgot_password', user.id);
     res.json({ message: 'If the account exists, an OTP has been sent to the email address' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.resendOTP = async (req, res, next) => {
+  try {
+    const { error, value } = validateBody(resendOTPSchema, req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const email = normalizeEmail(value.email);
+    const { purpose } = value;
+    const user = await User.findOne({ where: { email } });
+
+    if (purpose === 'registration') {
+      if (!user) return res.status(404).json({ error: 'User not found for registration OTP' });
+      if (user.email_verified) return res.status(400).json({ error: 'Email is already verified' });
+      await createOTP(email, 'registration', user.id);
+      return res.json({ message: 'OTP resent successfully' });
+    }
+
+    if (purpose === 'login') {
+      if (!user) return res.status(404).json({ error: 'User not found for login OTP' });
+      if (!user.email_verified) return res.status(403).json({ error: 'Email not verified' });
+      await createOTP(email, 'login', user.id);
+      return res.json({ message: 'OTP resent successfully' });
+    }
+
+    if (user) {
+      await createOTP(email, 'forgot_password', user.id);
+    }
+    return res.json({ message: 'If the account exists, an OTP has been sent to the email address' });
   } catch (err) {
     next(err);
   }

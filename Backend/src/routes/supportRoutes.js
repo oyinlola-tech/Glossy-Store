@@ -13,8 +13,10 @@ router.get('/conversations', supportController.getMyConversations);
 router.get('/unread-count', supportController.getUnreadCount);
 router.get('/conversations/:id/messages', supportController.getConversationMessages);
 router.post('/conversations/:id/messages', supportRateLimiter, supportUpload.array('attachments', 5), secureSupportAttachments, supportController.sendConversationMessage);
+router.delete('/conversations/:id/messages', supportController.clearConversationMessages);
 router.patch('/conversations/:id/read', supportController.markConversationRead);
 router.patch('/conversations/:id/status', supportController.updateConversationStatus);
+router.delete('/conversations/:id', supportController.deleteConversation);
 router.get('/attachments/:attachmentId/signed-url', supportController.getAttachmentSignedUrl);
 router.get('/attachments/:attachmentId/download', supportController.downloadAttachment);
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MessageCircle, Send, X } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -15,23 +15,63 @@ type Conversation = {
 
 type SupportMessage = {
   id: number;
+  support_conversation_id?: number;
   sender_user_id: number;
   sender_role: 'user' | 'admin';
   message?: string | null;
   created_at: string;
 };
 
+type SocketClient = {
+  connected: boolean;
+  emit: (event: string, payload?: any) => void;
+  on: (event: string, handler: (...args: any[]) => void) => void;
+  off: (event: string, handler?: (...args: any[]) => void) => void;
+  disconnect: () => void;
+};
+
+declare global {
+  interface Window {
+    io?: (url?: string, opts?: Record<string, unknown>) => SocketClient;
+  }
+}
+
+const loadSocketClientScript = async (): Promise<void> => {
+  if (window.io) return;
+  await new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-socket-io-client="true"]');
+    if (existing) {
+      if ((window as any).io) resolve();
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Failed to load socket client')), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = '/socket.io/socket.io.js';
+    script.async = true;
+    script.setAttribute('data-socket-io-client', 'true');
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load socket client'));
+    document.head.appendChild(script);
+  });
+};
+
 export function SupportChatWidget() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const socketRef = useRef<SocketClient | null>(null);
+  const typingStopTimerRef = useRef<number | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [socketReady, setSocketReady] = useState(false);
+  const [socketStatus, setSocketStatus] = useState<'connecting' | 'connected' | 'reconnecting' | 'offline'>('offline');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [subject, setSubject] = useState('Support Request');
   const [unreadCount, setUnreadCount] = useState(0);
+  const [typingNotice, setTypingNotice] = useState('');
 
   const activeConversation = useMemo(
     () => conversations.find((item) => item.id === activeConversationId) || null,
@@ -51,7 +91,7 @@ export function SupportChatWidget() {
         setActiveConversationId(items[0].id);
       }
     } catch {
-      // no-op for widget polling
+      // Widget should not block page rendering on this.
     }
   };
 
@@ -62,6 +102,7 @@ export function SupportChatWidget() {
       const payload = await api.getSupportMessages(conversationId) as { messages: SupportMessage[] };
       setMessages(Array.isArray(payload?.messages) ? payload.messages : []);
       await api.markSupportConversationRead(conversationId);
+      socketRef.current?.emit('support:mark_read', { conversationId });
       await loadConversations();
     } catch (error: any) {
       toast.error(error.message || 'Failed to load support messages');
@@ -76,18 +117,119 @@ export function SupportChatWidget() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || !open) return;
-    const timer = setInterval(() => {
-      void loadConversations();
-      if (activeConversationId) void loadMessages(activeConversationId);
-    }, 8000);
-    return () => clearInterval(timer);
-  }, [user, open, activeConversationId]);
+    let mounted = true;
+    const connect = async () => {
+      if (!user?.token) return;
+      setSocketStatus('connecting');
+      try {
+        await loadSocketClientScript();
+        if (!mounted || !window.io) return;
+
+        const socket = window.io(undefined, {
+          path: '/socket.io',
+          transports: ['websocket', 'polling'],
+          auth: { token: user.token },
+        });
+        socketRef.current = socket;
+
+        const onConnect = () => {
+          setSocketReady(true);
+          setSocketStatus('connected');
+        };
+        const onDisconnect = () => {
+          setSocketReady(false);
+          setSocketStatus('reconnecting');
+        };
+        const onConnectError = () => {
+          setSocketReady(false);
+          setSocketStatus(navigator.onLine ? 'reconnecting' : 'offline');
+        };
+        const onReconnectAttempt = () => {
+          setSocketStatus('reconnecting');
+        };
+        const onError = (payload: { message?: string }) => {
+          if (payload?.message) toast.error(payload.message);
+        };
+        const onUnreadCount = (payload: { total_unread_count?: number }) => {
+          setUnreadCount(Number(payload?.total_unread_count || 0));
+          void loadConversations();
+        };
+        const onRefreshUnread = () => {
+          void loadConversations();
+        };
+        const onNewMessage = (message: SupportMessage) => {
+          const incomingConversationId = Number(message.support_conversation_id || 0);
+          if (incomingConversationId && incomingConversationId !== activeConversationId) {
+            void loadConversations();
+            return;
+          }
+          setMessages((prev) => {
+            if (prev.some((item) => item.id === message.id)) return prev;
+            return [...prev, message];
+          });
+          if (activeConversationId) {
+            socket.emit('support:mark_read', { conversationId: activeConversationId });
+            void loadConversations();
+          }
+        };
+        const onTyping = (payload: { conversationId: number; isTyping: boolean; user?: { name?: string } }) => {
+          if (!activeConversationId || Number(payload.conversationId) !== Number(activeConversationId)) return;
+          if (payload.isTyping) {
+            setTypingNotice(`${payload.user?.name || 'Support'} is typing...`);
+          } else {
+            setTypingNotice('');
+          }
+        };
+
+        socket.on('connect', onConnect);
+        socket.on('disconnect', onDisconnect);
+        socket.on('connect_error', onConnectError);
+        socket.on('reconnect_attempt', onReconnectAttempt);
+        socket.on('support:error', onError);
+        socket.on('support:unread_count', onUnreadCount);
+        socket.on('support:refresh_unread', onRefreshUnread);
+        socket.on('support:new_message', onNewMessage);
+        socket.on('support:typing', onTyping);
+      } catch {
+        setSocketReady(false);
+        setSocketStatus('offline');
+      }
+    };
+    void connect();
+
+    return () => {
+      mounted = false;
+      if (typingStopTimerRef.current) {
+        window.clearTimeout(typingStopTimerRef.current);
+        typingStopTimerRef.current = null;
+      }
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      setSocketStatus('offline');
+    };
+  }, [user?.token, activeConversationId]);
 
   useEffect(() => {
-    if (open && activeConversationId) {
-      void loadMessages(activeConversationId);
-    }
+    const handleOnline = () => {
+      setSocketStatus((prev) => (prev === 'connected' ? 'connected' : 'reconnecting'));
+    };
+    const handleOffline = () => {
+      setSocketStatus('offline');
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open || !activeConversationId) return;
+    socketRef.current?.emit('support:join', { conversationId: activeConversationId });
+    void loadMessages(activeConversationId);
   }, [open, activeConversationId]);
 
   const openWidget = () => {
@@ -99,22 +241,45 @@ export function SupportChatWidget() {
     setOpen(true);
   };
 
+  const sendTypingSignal = (isTyping: boolean) => {
+    if (!activeConversationId || !socketRef.current) return;
+    socketRef.current.emit('support:typing', { conversationId: activeConversationId, isTyping });
+  };
+
+  const onDraftChange = (value: string) => {
+    setDraft(value);
+    if (!activeConversationId) return;
+    sendTypingSignal(true);
+    if (typingStopTimerRef.current) window.clearTimeout(typingStopTimerRef.current);
+    typingStopTimerRef.current = window.setTimeout(() => sendTypingSignal(false), 1200);
+  };
+
   const sendMessage = async () => {
     const message = draft.trim();
     if (!message) return;
     setLoading(true);
     try {
       if (!activeConversationId) {
-        const created = await api.createSupportConversation({ subject: subject.trim() || 'Support Request', message }) as {
-          conversation: { id: number };
-        };
+        const created = await api.createSupportConversation({
+          subject: subject.trim() || 'Support Request',
+          message,
+        }) as { conversation: { id: number }; firstMessage?: SupportMessage };
         const id = created?.conversation?.id;
         if (id) {
           setActiveConversationId(id);
           setDraft('');
+          if (created.firstMessage) {
+            setMessages([created.firstMessage]);
+          } else {
+            await loadMessages(id);
+          }
           await loadConversations();
-          await loadMessages(id);
+          socketRef.current?.emit('support:join', { conversationId: id });
         }
+      } else if (socketRef.current && socketReady) {
+        socketRef.current.emit('support:message', { conversationId: activeConversationId, message });
+        setDraft('');
+        sendTypingSignal(false);
       } else {
         await api.sendSupportMessage(activeConversationId, message);
         setDraft('');
@@ -122,6 +287,51 @@ export function SupportChatWidget() {
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to send support message');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearMessages = async () => {
+    if (!activeConversationId) return;
+    setLoading(true);
+    try {
+      await api.clearSupportConversationMessages(activeConversationId);
+      setMessages([]);
+      toast.success('Chat messages cleared');
+      await loadConversations();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to clear chat');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteConversation = async () => {
+    if (!activeConversationId) return;
+    setLoading(true);
+    try {
+      await api.deleteSupportConversation(activeConversationId);
+      toast.success('Chat deleted');
+      setMessages([]);
+      setActiveConversationId(null);
+      await loadConversations();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete chat');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateConversationStatus = async (status: 'open' | 'resolved' | 'closed') => {
+    if (!activeConversationId) return;
+    setLoading(true);
+    try {
+      await api.updateSupportConversationStatus(activeConversationId, status);
+      toast.success(`Conversation marked ${status}`);
+      await loadConversations();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update status');
     } finally {
       setLoading(false);
     }
@@ -159,12 +369,61 @@ export function SupportChatWidget() {
       {open ? (
         <div className="fixed bottom-24 right-5 z-50 w-[calc(100vw-2.5rem)] max-w-[380px] h-[540px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden">
           <div className="h-12 px-4 bg-red-500 text-white flex items-center justify-between">
-            <p className="font-semibold">
-              {user.role === 'admin' || user.role === 'superadmin' ? 'Admin Support Console' : 'Chat with Support'}
-            </p>
-            <button onClick={() => setOpen(false)} aria-label="Close support chat">
-              <X className="size-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <p className="font-semibold">
+                {user.role === 'admin' || user.role === 'superadmin' ? 'Admin Support Console' : 'Chat with Support'}
+              </p>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full ${
+                  socketStatus === 'connected'
+                    ? 'bg-green-600'
+                    : socketStatus === 'reconnecting'
+                      ? 'bg-amber-500'
+                      : socketStatus === 'connecting'
+                        ? 'bg-blue-500'
+                        : 'bg-gray-700'
+                }`}
+                title={socketStatus}
+              >
+                {socketStatus === 'connected' ? 'Online' : socketStatus === 'reconnecting' ? 'Reconnecting...' : socketStatus === 'connecting' ? 'Connecting...' : 'Offline'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {activeConversationId ? (
+                <>
+                  {user.role === 'user' ? (
+                    <>
+                      <button
+                        onClick={() => void clearMessages()}
+                        className="text-[10px] px-2 py-1 rounded bg-white/20 hover:bg-white/30"
+                      >
+                        Clear
+                      </button>
+                      <button
+                        onClick={() => void deleteConversation()}
+                        className="text-[10px] px-2 py-1 rounded bg-black/30 hover:bg-black/40"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  ) : null}
+                  {user.role !== 'user' ? (
+                    <select
+                      value={activeConversation?.status || 'open'}
+                      onChange={(e) => void updateConversationStatus(e.target.value as 'open' | 'resolved' | 'closed')}
+                      className="text-[10px] text-black bg-white rounded px-1 py-0.5"
+                    >
+                      <option value="open">Open</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  ) : null}
+                </>
+              ) : null}
+              <button onClick={() => setOpen(false)} aria-label="Close support chat">
+                <X className="size-4" />
+              </button>
+            </div>
           </div>
 
           <div className="h-[calc(100%-3rem)] grid grid-cols-1">
@@ -190,12 +449,13 @@ export function SupportChatWidget() {
                   loading={loading}
                   messages={messages}
                   draft={draft}
-                  setDraft={setDraft}
+                  setDraft={onDraftChange}
                   onSend={sendMessage}
                   subject={subject}
                   setSubject={setSubject}
                   hasConversation={Boolean(activeConversationId)}
                   isUser={false}
+                  typingNotice={typingNotice}
                 />
               </div>
             ) : (
@@ -203,12 +463,13 @@ export function SupportChatWidget() {
                 loading={loading}
                 messages={messages}
                 draft={draft}
-                setDraft={setDraft}
+                setDraft={onDraftChange}
                 onSend={sendMessage}
                 subject={subject}
                 setSubject={setSubject}
                 hasConversation={Boolean(activeConversationId)}
                 isUser
+                typingNotice={typingNotice}
               />
             )}
           </div>
@@ -228,6 +489,7 @@ function ChatPanel({
   setSubject,
   hasConversation,
   isUser,
+  typingNotice,
 }: {
   loading: boolean;
   messages: SupportMessage[];
@@ -238,6 +500,7 @@ function ChatPanel({
   setSubject: (value: string) => void;
   hasConversation: boolean;
   isUser: boolean;
+  typingNotice: string;
 }) {
   return (
     <div className="h-full flex flex-col">
@@ -246,6 +509,7 @@ function ChatPanel({
           <input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
+            maxLength={120}
             className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-black dark:text-white text-sm"
             placeholder="Conversation subject"
           />
@@ -274,6 +538,9 @@ function ChatPanel({
             {loading ? 'Loading messages...' : 'No messages yet. Start the conversation.'}
           </p>
         )}
+        {typingNotice ? (
+          <p className="text-[11px] text-gray-500 dark:text-gray-400 italic">{typingNotice}</p>
+        ) : null}
       </div>
 
       <div className="p-3 border-t border-gray-200 dark:border-gray-700">

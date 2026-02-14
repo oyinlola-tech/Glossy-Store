@@ -10,6 +10,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { OrdersPage } from './pages/OrdersPage';
+import { OtpVerificationPage } from './pages/OtpVerificationPage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -93,6 +94,7 @@ export const router = createBrowserRouter([
   { path: '/', element: <MainLayout><HomePage /></MainLayout> },
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
+  { path: '/otp', element: <OtpVerificationPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/products', element: <MainLayout><ProductsPage /></MainLayout> },
   { path: '/products/:id', element: <MainLayout><ProductDetailPage /></MainLayout> },

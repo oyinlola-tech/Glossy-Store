@@ -4,6 +4,8 @@ const {
   SupportConversation,
   SupportMessageAttachment,
   SupportMessage,
+  SupportMessageReceipt,
+  sequelize,
   User,
 } = require('../models');
 const { createSignedAttachmentUrl, verifySignedAttachmentUrl } = require('../services/attachmentUrlService');
@@ -258,6 +260,110 @@ exports.updateConversationStatus = async (req, res, next) => {
     conversation.status = status;
     await conversation.save();
     return res.json(conversation);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+exports.clearConversationMessages = async (req, res, next) => {
+  try {
+    const conversation = await SupportConversation.findByPk(req.params.id);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Support conversation not found' });
+    }
+    if (!canAccessConversation(conversation, req.user)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const messageIds = (await SupportMessage.findAll({
+      where: { support_conversation_id: conversation.id },
+      attributes: ['id'],
+    })).map((message) => message.id);
+
+    if (messageIds.length) {
+      const attachments = await SupportMessageAttachment.findAll({
+        where: { support_message_id: messageIds },
+        attributes: ['id', 'storage_path'],
+      });
+
+      await sequelize.transaction(async (transaction) => {
+        await SupportMessageAttachment.destroy({
+          where: { support_message_id: messageIds },
+          transaction,
+        });
+        await SupportMessageReceipt.destroy({
+          where: { support_message_id: messageIds },
+          transaction,
+        });
+        await SupportMessage.destroy({
+          where: { id: messageIds },
+          transaction,
+        });
+        conversation.last_message_at = null;
+        await conversation.save({ transaction });
+      });
+
+      attachments.forEach((attachment) => {
+        const absolutePath = path.resolve(attachment.storage_path);
+        fs.unlink(absolutePath, () => {});
+      });
+    }
+
+    return res.json({ message: 'Conversation messages cleared successfully' });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+exports.deleteConversation = async (req, res, next) => {
+  try {
+    const conversation = await SupportConversation.findByPk(req.params.id);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Support conversation not found' });
+    }
+    if (!canAccessConversation(conversation, req.user)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const messageIds = (await SupportMessage.findAll({
+      where: { support_conversation_id: conversation.id },
+      attributes: ['id'],
+    })).map((message) => message.id);
+
+    const attachments = messageIds.length
+      ? await SupportMessageAttachment.findAll({
+          where: { support_message_id: messageIds },
+          attributes: ['id', 'storage_path'],
+        })
+      : [];
+
+    await sequelize.transaction(async (transaction) => {
+      if (messageIds.length) {
+        await SupportMessageAttachment.destroy({
+          where: { support_message_id: messageIds },
+          transaction,
+        });
+        await SupportMessageReceipt.destroy({
+          where: { support_message_id: messageIds },
+          transaction,
+        });
+        await SupportMessage.destroy({
+          where: { id: messageIds },
+          transaction,
+        });
+      }
+      await SupportConversation.destroy({
+        where: { id: conversation.id },
+        transaction,
+      });
+    });
+
+    attachments.forEach((attachment) => {
+      const absolutePath = path.resolve(attachment.storage_path);
+      fs.unlink(absolutePath, () => {});
+    });
+
+    return res.json({ message: 'Conversation deleted successfully' });
   } catch (err) {
     return next(err);
   }

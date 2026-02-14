@@ -1,0 +1,129 @@
+import { useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
+import * as api from '../services/api';
+
+type OtpPurpose = 'registration' | 'login';
+
+const PURPOSE_LABEL: Record<OtpPurpose, string> = {
+  registration: 'Complete Registration',
+  login: 'Complete Login',
+};
+
+export function OtpVerificationPage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { verifyLoginOTP } = useAuth();
+
+  const email = useMemo(() => searchParams.get('email')?.trim().toLowerCase() || '', [searchParams]);
+  const rawPurpose = (searchParams.get('purpose') || '').trim().toLowerCase();
+  const purpose: OtpPurpose | null = rawPurpose === 'registration' || rawPurpose === 'login' ? rawPurpose : null;
+
+  const [otp, setOtp] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  if (!email || !purpose) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center px-4">
+        <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+          <h1 className="text-2xl font-bold text-black dark:text-white mb-3">OTP Verification</h1>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
+            This OTP link is incomplete. Please restart login or registration.
+          </p>
+          <div className="flex gap-3">
+            <Link to="/login" className="text-red-500 hover:underline">Go to Login</Link>
+            <Link to="/register" className="text-red-500 hover:underline">Go to Register</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const normalizedOtp = otp.trim();
+    if (!/^\d{6}$/.test(normalizedOtp)) {
+      toast.error('OTP must be 6 digits');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (purpose === 'login') {
+        await verifyLoginOTP(email, normalizedOtp);
+        toast.success('Login successful');
+        navigate('/');
+        return;
+      }
+
+      await api.verifyOTP({ email, otp: normalizedOtp, purpose: 'registration' });
+      toast.success('Registration verified. Please log in.');
+      navigate('/login');
+    } catch (error: any) {
+      toast.error(error.message || 'OTP verification failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await api.resendOTP({ email, purpose });
+      toast.success('A new OTP has been sent');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to resend OTP');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+        <h1 className="text-2xl font-bold text-black dark:text-white mb-1">{PURPOSE_LABEL[purpose]}</h1>
+        <p className="text-gray-600 dark:text-gray-300 mb-6">
+          Enter the 6-digit OTP sent to <span className="font-medium">{email}</span>.
+        </p>
+
+        <form onSubmit={handleVerify} className="space-y-4">
+          <input
+            type="text"
+            required
+            value={otp}
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="Enter 6-digit OTP"
+            inputMode="numeric"
+            maxLength={6}
+            className="w-full px-4 py-3 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white"
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-red-500 text-white py-3 rounded hover:bg-red-600 transition-colors disabled:opacity-60"
+          >
+            {loading ? 'Verifying...' : 'Verify OTP'}
+          </button>
+        </form>
+
+        <button
+          type="button"
+          disabled={resending}
+          onClick={handleResend}
+          className="w-full mt-3 text-red-500 hover:underline disabled:opacity-60"
+        >
+          {resending ? 'Resending...' : 'Resend OTP'}
+        </button>
+
+        <div className="mt-4 text-sm">
+          <Link to={purpose === 'login' ? '/login' : '/register'} className="text-gray-600 dark:text-gray-300 hover:underline">
+            Back
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}

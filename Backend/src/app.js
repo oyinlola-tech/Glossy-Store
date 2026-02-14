@@ -11,6 +11,7 @@ const { mountSwagger } = require('./config/swagger');
 const { createDatabaseIfNotExists } = require('./config/databaseBootstrap');
 const { seedSuperAdminFromEnv } = require('./services/adminBootstrapService');
 const { runMigrations } = require('./services/migrationService');
+require('./models');
 
 const app = express();
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
