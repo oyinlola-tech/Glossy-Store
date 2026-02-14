@@ -8,6 +8,8 @@ const {
 } = require('../models');
 const { createSignedAttachmentUrl } = require('./attachmentUrlService');
 
+const SUPPORT_MESSAGE_MAX_LENGTH = 2000;
+
 const getConversationById = async (conversationId) => {
   return SupportConversation.findByPk(conversationId, {
     include: [{ model: User, attributes: ['id', 'name', 'email'] }],
@@ -79,6 +81,9 @@ const createMessage = async ({ conversationId, senderUser, message, attachments 
     throw new Error('Access denied');
   }
   const trimmedMessage = message ? String(message).trim() : '';
+  if (trimmedMessage.length > SUPPORT_MESSAGE_MAX_LENGTH) {
+    throw new Error(`Message exceeds maximum length of ${SUPPORT_MESSAGE_MAX_LENGTH} characters`);
+  }
   if (!trimmedMessage && !attachments.length) {
     throw new Error('Message or attachment is required');
   }

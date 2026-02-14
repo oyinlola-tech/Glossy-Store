@@ -24,6 +24,12 @@ const toAttachmentPayload = (files = []) => files.map((file) => ({
   file_size: file.size,
 }));
 
+const sanitizeDownloadFilename = (filename) =>
+  String(filename || 'attachment')
+    .replace(/[\r\n"]/g, '')
+    .replace(/[^\w.\- ]/g, '_')
+    .slice(0, 180);
+
 const toSocketSafeMessage = (message) => ({
   ...message,
   SupportMessageAttachments: (message.SupportMessageAttachments || []).map((attachment) => ({
@@ -37,9 +43,13 @@ const toSocketSafeMessage = (message) => ({
 exports.createConversation = async (req, res, next) => {
   try {
     const { subject, message } = req.body;
+    const normalizedSubject = subject ? String(subject).trim() : '';
+    if (normalizedSubject.length > 120) {
+      return res.status(400).json({ error: 'Subject cannot exceed 120 characters' });
+    }
     const conversation = await SupportConversation.create({
       user_id: req.user.id,
-      subject: subject || null,
+      subject: normalizedSubject || null,
       status: 'open',
       last_message_at: new Date(),
     });
@@ -189,7 +199,9 @@ exports.downloadAttachment = async (req, res, next) => {
     }
 
     res.setHeader('Content-Type', attachment.mime_type);
-    res.setHeader('Content-Disposition', `attachment; filename="${attachment.file_name}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Content-Disposition', `attachment; filename="${sanitizeDownloadFilename(attachment.file_name)}"`);
     return res.sendFile(absolutePath);
   } catch (err) {
     return next(err);

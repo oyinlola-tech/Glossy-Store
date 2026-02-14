@@ -1,5 +1,9 @@
 const errorHandler = (err, req, res, next) => {
-  console.error(err.stack);
+  if (process.env.NODE_ENV === 'production') {
+    console.error(err.message);
+  } else {
+    console.error(err.stack);
+  }
 
   if (err.message === 'Origin not allowed by CORS') {
     return res.status(403).json({ error: 'Origin not allowed' });
