@@ -9,9 +9,15 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const isValidEmail = /\S+@\S+\.\S+/.test(email.trim());
+  const isFormValid = isValidEmail && password.trim().length >= 8;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isFormValid) {
+      toast.error('Enter a valid email and password');
+      return;
+    }
     setLoading(true);
     
     try {
@@ -46,6 +52,8 @@ export function LoginPage() {
               <input
                 type="email"
                 required
+                autoComplete="email"
+                aria-label="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email"
@@ -56,6 +64,9 @@ export function LoginPage() {
               <input
                 type="password"
                 required
+                autoComplete="current-password"
+                aria-label="Password"
+                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
@@ -72,7 +83,7 @@ export function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !isFormValid}
             className="w-full bg-[#b42318] text-white py-3 rounded hover:bg-[#8f1b12] transition-colors disabled:opacity-50 font-semibold"
           >
             {loading ? 'Logging in...' : 'Log In'}

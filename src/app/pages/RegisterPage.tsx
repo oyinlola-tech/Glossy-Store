@@ -10,9 +10,16 @@ export function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const isValidEmail = /\S+@\S+\.\S+/.test(email.trim());
+  const isStrongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
+  const isFormValid = name.trim().length >= 2 && isValidEmail && isStrongPassword;
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isFormValid) {
+      toast.error('Enter a valid name, email, and strong password');
+      return;
+    }
     setLoading(true);
 
     try {
@@ -52,6 +59,9 @@ export function RegisterPage() {
                 <input
                   type="text"
                   required
+                  aria-label="Full name"
+                  autoComplete="name"
+                  minLength={2}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Name"
@@ -62,6 +72,8 @@ export function RegisterPage() {
                 <input
                   type="email"
                   required
+                  aria-label="Email address"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Email"
@@ -72,6 +84,9 @@ export function RegisterPage() {
                 <input
                   type="password"
                   required
+                  aria-label="Password"
+                  autoComplete="new-password"
+                  minLength={8}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password"
@@ -80,9 +95,15 @@ export function RegisterPage() {
               </div>
             </div>
 
+            {password.length > 0 && !isStrongPassword ? (
+              <p className="text-xs text-[#b42318]">
+                Password must be at least 8 characters with uppercase, lowercase, and a number.
+              </p>
+            ) : null}
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isFormValid}
               className="w-full bg-[#b42318] text-white py-3 rounded hover:bg-[#8f1b12] transition-colors disabled:opacity-50 font-semibold"
             >
               {loading ? 'Creating Account...' : 'Create Account'}

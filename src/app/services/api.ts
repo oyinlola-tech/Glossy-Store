@@ -117,6 +117,19 @@ export type AuthResponse = {
 
 export type LoginResponse = AuthResponse | { needOtp: true; message: string };
 
+export type UserProfileResponse = {
+  id: number;
+  name: string;
+  email: string;
+  role: 'user' | 'admin';
+  is_super_admin?: boolean;
+};
+
+export type UpdateUserProfileResponse = {
+  message?: string;
+  user: UserProfileResponse;
+};
+
 export type Product = {
   id: number;
   name: string;
@@ -186,6 +199,15 @@ export type CheckoutResponse = {
   };
 };
 
+export type CouponValidationResponse = {
+  message?: string;
+  coupon?: {
+    code?: string;
+    discountAmount?: number;
+    [key: string]: unknown;
+  };
+};
+
 const toNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -220,7 +242,7 @@ export const mapCartResponse = (raw: any): CartView => {
   return {
     id: raw?.id,
     items,
-    subtotal: items.reduce((sum, item) => sum + item.subtotal, 0),
+    subtotal: items.reduce((sum: number, item: CartItemView) => sum + item.subtotal, 0),
   };
 };
 
@@ -292,9 +314,9 @@ export const confirmDeleteAccount = (data: { otp: string }) =>
   });
 
 // Users
-export const getUserProfile = () => apiCall('/user/profile', { requireAuth: true });
+export const getUserProfile = () => apiCall<UserProfileResponse>('/user/profile', { requireAuth: true });
 export const updateUserProfile = (data: { name?: string }) =>
-  apiCall('/user/profile', {
+  apiCall<UpdateUserProfileResponse>('/user/profile', {
     method: 'PUT',
     requireAuth: true,
     body: JSON.stringify(data),
@@ -399,7 +421,7 @@ export const cancelOrder = (id: number | string) =>
 
 // Coupons
 export const validateCoupon = (code: string, cartTotal: number) =>
-  apiCall('/coupons/validate', {
+  apiCall<CouponValidationResponse>('/coupons/validate', {
     method: 'POST',
     body: JSON.stringify({ code, cartTotal }),
   });

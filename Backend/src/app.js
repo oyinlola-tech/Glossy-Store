@@ -5,6 +5,7 @@ const path = require('path');
 const rateLimit = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
 const requestLogger = require('./middleware/requestLogger');
+const sanitizeInput = require('./middleware/sanitizeInput');
 const routes = require('./routes');
 const sequelize = require('./config/database');
 const passport = require('./config/passport');
@@ -70,6 +71,7 @@ app.use(express.json({
   },
 }));
 app.use(express.urlencoded({ extended: true, limit: process.env.JSON_BODY_LIMIT || '1mb' }));
+app.use(sanitizeInput);
 app.use(rateLimit);
 app.use(passport.initialize());
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));

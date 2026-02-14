@@ -5,11 +5,12 @@ import { toast } from 'sonner';
 
 export function Footer() {
   const [email, setEmail] = useState('');
+  const socialBaseUrl = 'https://oyinlola.site';
 
   const subscribe = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) {
-      toast.error('Enter your email first');
+    if (!/\S+@\S+\.\S+/.test(email.trim())) {
+      toast.error('Enter a valid email address');
       return;
     }
     toast.success('Subscribed successfully');
@@ -28,11 +29,13 @@ export function Footer() {
               <input
                 type="email"
                 value={email}
+                required
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
+                aria-label="Newsletter email"
                 className="w-full bg-transparent border border-white rounded px-4 py-2 pr-10 text-sm"
               />
-              <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2">
+              <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2" aria-label="Subscribe">
                 <Send className="size-5" />
               </button>
             </form>
@@ -72,10 +75,10 @@ export function Footer() {
             <h3 className="text-xl font-semibold">Follow Us</h3>
             <p className="text-xs opacity-70">Get updates on offers and releases</p>
             <div className="flex gap-4 items-center">
-              <a href="#" aria-label="Facebook"><Facebook className="size-6 cursor-pointer hover:opacity-70" /></a>
-              <a href="#" aria-label="Twitter"><Twitter className="size-6 cursor-pointer hover:opacity-70" /></a>
-              <a href="#" aria-label="Instagram"><Instagram className="size-6 cursor-pointer hover:opacity-70" /></a>
-              <a href="#" aria-label="LinkedIn"><Linkedin className="size-6 cursor-pointer hover:opacity-70" /></a>
+              <a href={socialBaseUrl} target="_blank" rel="noopener noreferrer" aria-label="Facebook"><Facebook className="size-6 cursor-pointer hover:opacity-70" /></a>
+              <a href={socialBaseUrl} target="_blank" rel="noopener noreferrer" aria-label="Twitter"><Twitter className="size-6 cursor-pointer hover:opacity-70" /></a>
+              <a href={socialBaseUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram"><Instagram className="size-6 cursor-pointer hover:opacity-70" /></a>
+              <a href={socialBaseUrl} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><Linkedin className="size-6 cursor-pointer hover:opacity-70" /></a>
             </div>
           </div>
         </div>
@@ -83,7 +86,7 @@ export function Footer() {
 
       <div className="border-t border-gray-800 dark:border-gray-900 py-4">
         <div className="container mx-auto px-4">
-          <p className="text-center text-sm opacity-60">© Copyright Glossy Store 2026. All rights reserved</p>
+          <p className="text-center text-sm opacity-60">&copy; Copyright Glossy Store 2026. All rights reserved</p>
         </div>
       </div>
     </footer>

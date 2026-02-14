@@ -23,6 +23,7 @@ export function OtpVerificationPage() {
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const isOtpValid = /^\d{6}$/.test(otp.trim());
 
   if (!email || !purpose) {
     return (
@@ -96,13 +97,15 @@ export function OtpVerificationPage() {
             onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
             placeholder="Enter 6-digit OTP"
             inputMode="numeric"
+            autoComplete="one-time-code"
+            aria-label="One time password"
             maxLength={6}
             className="w-full px-4 py-3 rounded border border-[#d8cdbf] dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white focus:border-[#b42318] outline-none"
           />
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !isOtpValid}
             className="w-full bg-[#b42318] text-white py-3 rounded hover:bg-[#8f1b12] transition-colors disabled:opacity-60"
           >
             {loading ? 'Verifying...' : 'Verify OTP'}
@@ -111,7 +114,7 @@ export function OtpVerificationPage() {
 
         <button
           type="button"
-          disabled={resending}
+          disabled={resending || loading}
           onClick={handleResend}
           className="w-full mt-3 text-[#b42318] hover:underline disabled:opacity-60"
         >

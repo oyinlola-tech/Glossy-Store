@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import * as api from '../services/api';
 
 export function AccountPage() {
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<api.UserProfileResponse | null>(null);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

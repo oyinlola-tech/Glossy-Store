@@ -4,11 +4,12 @@ import { toast } from 'sonner';
 import * as api from '../services/api';
 
 type CheckoutState = { couponCode?: string };
+type CheckoutLocationState = CheckoutState | null;
 
 export function CheckoutPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const state = (location.state || {}) as CheckoutState;
+  const state = ((location.state as CheckoutLocationState) || {}) as CheckoutState;
   const [loading, setLoading] = useState(false);
   const [cart, setCart] = useState<api.CartView>({ items: [], subtotal: 0 });
   const [discountPreview, setDiscountPreview] = useState<api.DiscountPreviewResponse | null>(null);

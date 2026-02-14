@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router';
+import { createBrowserRouter, Navigate, Link } from 'react-router';
 import { Footer } from './components/Footer';
 import { Header } from './components/Header';
 import { useAuth } from './contexts/AuthContext';
@@ -82,9 +82,9 @@ function NotFoundPage() {
       <div className="container mx-auto px-4 py-20 text-center">
         <h1 className="text-6xl font-bold text-black dark:text-white mb-4">404</h1>
         <p className="text-2xl text-gray-600 dark:text-gray-400 mb-8">Page Not Found</p>
-        <a href="/" className="bg-red-500 text-white px-8 py-3 rounded hover:bg-red-600">
+        <Link to="/" className="bg-red-500 text-white px-8 py-3 rounded hover:bg-red-600">
           Back to Home
-        </a>
+        </Link>
       </div>
     </MainLayout>
   );

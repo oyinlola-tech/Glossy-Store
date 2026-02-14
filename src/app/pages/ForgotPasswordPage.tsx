@@ -10,9 +10,16 @@ export function ForgotPasswordPage() {
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const navigate = useNavigate();
+  const isValidEmail = /\S+@\S+\.\S+/.test(email.trim());
+  const isOtpValid = /^\d{6}$/.test(otp.trim());
+  const isStrongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(newPassword);
 
   const requestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isValidEmail) {
+      toast.error('Enter a valid email address');
+      return;
+    }
     setLoading(true);
     try {
       await api.forgotPassword({ email: email.trim() });
@@ -27,6 +34,10 @@ export function ForgotPasswordPage() {
 
   const resetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isValidEmail || !isOtpValid || !isStrongPassword) {
+      toast.error('Enter a valid email, OTP, and strong password');
+      return;
+    }
     setLoading(true);
     try {
       await api.resetPassword({ email: email.trim(), otp: otp.trim(), newPassword });
@@ -40,20 +51,21 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+    <div className="min-h-screen bg-gradient-to-br from-[#f7f1eb] via-white to-[#f8efe6] dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-white/95 dark:bg-gray-800 rounded-2xl border border-[#eadfce] shadow-[0_24px_60px_rgba(31,36,48,0.15)] p-6">
         <h1 className="text-2xl font-bold text-black dark:text-white mb-4">Reset Password</h1>
         {step === 'request' ? (
           <form onSubmit={requestOtp} className="space-y-4">
             <input
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email address"
-              className="w-full px-4 py-3 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white"
+              className="w-full px-4 py-3 rounded border border-[#d8cdbf] dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white focus:border-[#b42318] outline-none"
             />
-            <button disabled={loading} className="w-full bg-red-500 text-white py-3 rounded hover:bg-red-600 disabled:opacity-60">
+            <button disabled={loading || !isValidEmail} className="w-full bg-[#b42318] text-white py-3 rounded hover:bg-[#8f1b12] disabled:opacity-60">
               {loading ? 'Requesting...' : 'Request OTP'}
             </button>
           </form>
@@ -62,37 +74,45 @@ export function ForgotPasswordPage() {
             <input
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email address"
-              className="w-full px-4 py-3 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white"
+              className="w-full px-4 py-3 rounded border border-[#d8cdbf] dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white focus:border-[#b42318] outline-none"
             />
             <input
               type="text"
               required
               value={otp}
-              onChange={(e) => setOtp(e.target.value)}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="OTP"
               maxLength={6}
               inputMode="numeric"
-              className="w-full px-4 py-3 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white"
+              autoComplete="one-time-code"
+              className="w-full px-4 py-3 rounded border border-[#d8cdbf] dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white focus:border-[#b42318] outline-none"
             />
             <input
               type="password"
               required
               minLength={8}
+              autoComplete="new-password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="New password"
-              className="w-full px-4 py-3 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white"
+              className="w-full px-4 py-3 rounded border border-[#d8cdbf] dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white focus:border-[#b42318] outline-none"
             />
-            <button disabled={loading} className="w-full bg-red-500 text-white py-3 rounded hover:bg-red-600 disabled:opacity-60">
+            {newPassword.length > 0 && !isStrongPassword ? (
+              <p className="text-xs text-[#b42318]">
+                Password must include uppercase, lowercase, and a number.
+              </p>
+            ) : null}
+            <button disabled={loading || !isValidEmail || !isOtpValid || !isStrongPassword} className="w-full bg-[#b42318] text-white py-3 rounded hover:bg-[#8f1b12] disabled:opacity-60">
               {loading ? 'Resetting...' : 'Reset Password'}
             </button>
           </form>
         )}
         <div className="mt-4 text-sm">
-          <Link to="/login" className="text-red-500 hover:underline">Back to login</Link>
+          <Link to="/login" className="text-[#b42318] hover:underline">Back to login</Link>
         </div>
       </div>
     </div>
