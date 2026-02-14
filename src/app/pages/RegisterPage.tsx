@@ -28,22 +28,22 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 flex">
-      <div className="hidden lg:block lg:w-1/2 bg-gradient-to-br from-blue-200 to-blue-100 dark:from-blue-900 dark:to-blue-800">
+    <div className="min-h-screen bg-gradient-to-br from-[#f7f1eb] via-white to-[#f8efe6] dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 flex">
+      <div className="hidden lg:block lg:w-1/2 bg-gradient-to-br from-[#1f2430] via-[#5a140e] to-[#b42318]">
         <div className="h-full flex items-center justify-center p-12">
           <div className="text-center">
-            <div className="text-6xl mb-4">Store</div>
-            <h2 className="text-3xl font-bold text-gray-800 dark:text-white">Welcome to Glossy Store</h2>
-            <p className="mt-4 text-gray-600 dark:text-gray-300">Discover amazing products at great prices</p>
+            <div className="text-5xl mb-5 text-[#d4af37] font-bold tracking-[0.2em]">GLOSSY</div>
+            <h2 className="text-3xl font-bold text-white">Welcome to Glossy Store</h2>
+            <p className="mt-4 text-gray-200">Elegant commerce with secure identity verification.</p>
           </div>
         </div>
       </div>
 
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <div className="max-w-md w-full space-y-8">
+        <div className="max-w-md w-full space-y-8 rounded-2xl border border-[#eadfce] bg-white/95 dark:bg-gray-900/85 p-8 shadow-[0_24px_60px_rgba(31,36,48,0.15)]">
           <div>
             <h2 className="text-4xl font-bold text-black dark:text-white mb-2">Create an account</h2>
-            <p className="text-gray-600 dark:text-gray-400">Enter your details below</p>
+            <p className="text-gray-600 dark:text-gray-300">Join the premium shopping experience.</p>
           </div>
 
           <form onSubmit={handleRegister} className="mt-8 space-y-6">
@@ -55,7 +55,7 @@ export function RegisterPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Name"
-                  className="w-full px-0 py-3 border-b-2 border-gray-300 dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-red-500 outline-none"
+                  className="w-full px-0 py-3 border-b-2 border-[#d8cdbf] dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-[#b42318] outline-none"
                 />
               </div>
               <div>
@@ -65,7 +65,7 @@ export function RegisterPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Email"
-                  className="w-full px-0 py-3 border-b-2 border-gray-300 dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-red-500 outline-none"
+                  className="w-full px-0 py-3 border-b-2 border-[#d8cdbf] dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-[#b42318] outline-none"
                 />
               </div>
               <div>
@@ -75,7 +75,7 @@ export function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password"
-                  className="w-full px-0 py-3 border-b-2 border-gray-300 dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-red-500 outline-none"
+                  className="w-full px-0 py-3 border-b-2 border-[#d8cdbf] dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-[#b42318] outline-none"
                 />
               </div>
             </div>
@@ -83,7 +83,7 @@ export function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-red-500 text-white py-3 rounded hover:bg-red-600 transition-colors disabled:opacity-50 font-semibold"
+              className="w-full bg-[#b42318] text-white py-3 rounded hover:bg-[#8f1b12] transition-colors disabled:opacity-50 font-semibold"
             >
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
@@ -91,7 +91,7 @@ export function RegisterPage() {
             <div className="text-center">
               <p className="text-gray-600 dark:text-gray-400">
                 Already have an account?{' '}
-                <Link to="/login" className="text-red-500 hover:underline font-semibold">
+                <Link to="/login" className="text-[#b42318] hover:underline font-semibold">
                   Log In
                 </Link>
               </p>

@@ -2,9 +2,9 @@ const getBrandTokens = () => ({
   brandName: process.env.BRAND_NAME || 'Glossy Store',
   supportEmail: process.env.SUPPORT_EMAIL || process.env.EMAIL_USER || '',
   appUrl: process.env.APP_BASE_URL || '#',
-  accentPrimary: process.env.BRAND_PRIMARY_COLOR || '#D4AF37',
-  accentSecondary: process.env.BRAND_SECONDARY_COLOR || '#2F3A5A',
-  accentTertiary: process.env.BRAND_TERTIARY_COLOR || '#E94F7A',
+  accentPrimary: process.env.BRAND_PRIMARY_COLOR || '#b42318',
+  accentSecondary: process.env.BRAND_SECONDARY_COLOR || '#1f2430',
+  accentTertiary: process.env.BRAND_TERTIARY_COLOR || '#d4af37',
 });
 
 const escapeHtml = (value = '') => String(value)
@@ -24,16 +24,16 @@ const baseTemplate = ({ title, preheader, contentHtml, ctaLabel, ctaUrl }) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${title}</title>
   </head>
-  <body style="margin:0;padding:0;background:#f7f1e8;font-family:Segoe UI,Arial,sans-serif;color:#1f2430;">
+  <body style="margin:0;padding:0;background:#f6f1eb;font-family:Segoe UI,Arial,sans-serif;color:#1f2430;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</div>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:28px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 18px 40px rgba(31,36,48,0.15);">
+          <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #eadfce;box-shadow:0 18px 40px rgba(31,36,48,0.15);">
             <tr>
-              <td style="padding:28px;background:linear-gradient(135deg, ${t.accentPrimary}, ${t.accentTertiary});color:#ffffff;">
+              <td style="padding:28px;background:linear-gradient(135deg, ${t.accentSecondary}, ${t.accentPrimary});color:#ffffff;">
                 <h1 style="margin:0;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:0.4px;">${t.brandName}</h1>
-                <p style="margin:8px 0 0 0;font-size:14px;opacity:0.95;">Luxury Shopping, Seamless Security</p>
+                <p style="margin:8px 0 0 0;font-size:14px;opacity:0.95;">Luxury Shopping. Hardened Security.</p>
               </td>
             </tr>
             <tr>
@@ -42,14 +42,14 @@ const baseTemplate = ({ title, preheader, contentHtml, ctaLabel, ctaUrl }) => {
             ${ctaLabel && ctaUrl ? `
             <tr>
               <td style="padding:8px 32px 24px 32px;">
-                <a href="${ctaUrl}" style="display:inline-block;background:${t.accentSecondary};color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:999px;font-size:14px;font-weight:600;">${ctaLabel}</a>
+                <a href="${ctaUrl}" style="display:inline-block;background:${t.accentPrimary};color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:999px;font-size:14px;font-weight:600;">${ctaLabel}</a>
               </td>
             </tr>` : ''}
             <tr>
               <td style="padding:18px 32px 28px 32px;background:#faf7f2;border-top:1px solid #f0e6d6;">
                 <p style="margin:0;font-size:12px;color:#5b6370;line-height:1.6;">
                   Need help? Contact us at <a href="mailto:${t.supportEmail}" style="color:${t.accentSecondary};text-decoration:none;">${t.supportEmail}</a><br/>
-                  © ${new Date().getFullYear()} ${t.brandName}. All rights reserved.
+                  &copy; ${new Date().getFullYear()} ${t.brandName}. All rights reserved.
                 </p>
               </td>
             </tr>
@@ -63,7 +63,7 @@ const baseTemplate = ({ title, preheader, contentHtml, ctaLabel, ctaUrl }) => {
 
 const otpPurposeText = {
   registration: 'Complete your registration',
-  login: 'Confirm your new-device login',
+  login: 'Confirm your sign-in',
   forgot_password: 'Reset your password securely',
   delete_account: 'Confirm account deletion request',
 };
@@ -71,6 +71,10 @@ const otpPurposeText = {
 const renderOtpTemplate = ({ otp, purpose }) => {
   const t = getBrandTokens();
   const action = otpPurposeText[purpose] || 'Confirm your secure action';
+  const adminHint = purpose === 'login'
+    ? '<p style="margin:14px 0 0 0;font-size:13px;color:#5b6370;line-height:1.6;">Administrative access always requires OTP verification.</p>'
+    : '';
+
   return baseTemplate({
     title: `${t.brandName} Security Code`,
     preheader: `${action} with this one-time verification code.`,
@@ -80,11 +84,12 @@ const renderOtpTemplate = ({ otp, purpose }) => {
         For your security, use the verification code below. This code expires in 10 minutes and can only be used once.
       </p>
       <div style="margin:18px 0 20px 0;padding:16px;background:#fff7e7;border:1px solid #f2dfba;border-radius:14px;text-align:center;">
-        <span style="font-size:34px;letter-spacing:9px;font-weight:700;color:${t.accentSecondary};">${otp}</span>
+        <span style="font-size:34px;letter-spacing:9px;font-weight:700;color:${t.accentPrimary};">${otp}</span>
       </div>
       <p style="margin:0 0 6px 0;font-size:13px;color:#5b6370;line-height:1.6;">
         If you did not request this action, secure your account immediately by changing your password.
-      </p>`,
+      </p>
+      ${adminHint}`,
     ctaLabel: 'Open Glossy Store',
     ctaUrl: t.appUrl,
   });
@@ -118,7 +123,7 @@ const renderDeviceChangeTemplate = ({ ipAddress }) => {
       <p style="margin:0 0 14px 0;font-size:15px;color:#3b4352;line-height:1.7;">
         We detected a login attempt from a new IP address:
       </p>
-      <p style="margin:0 0 18px 0;font-size:16px;color:${t.accentSecondary};font-weight:700;">${escapeHtml(ipAddress)}</p>
+      <p style="margin:0 0 18px 0;font-size:16px;color:${t.accentPrimary};font-weight:700;">${escapeHtml(ipAddress)}</p>
       <p style="margin:0;font-size:14px;color:#5b6370;line-height:1.7;">
         If this was you, continue with your OTP verification. If this was not you, reset your password immediately and contact support.
       </p>`,

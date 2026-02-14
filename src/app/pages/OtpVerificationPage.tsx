@@ -26,15 +26,15 @@ export function OtpVerificationPage() {
 
   if (!email || !purpose) {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center px-4">
-        <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+      <div className="min-h-screen bg-gradient-to-br from-[#f7f1eb] via-white to-[#f8efe6] dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 flex items-center justify-center px-4">
+        <div className="w-full max-w-md bg-white/95 dark:bg-gray-800 rounded-2xl border border-[#eadfce] shadow-[0_24px_60px_rgba(31,36,48,0.15)] p-6">
           <h1 className="text-2xl font-bold text-black dark:text-white mb-3">OTP Verification</h1>
           <p className="text-gray-600 dark:text-gray-300 mb-4">
             This OTP link is incomplete. Please restart login or registration.
           </p>
           <div className="flex gap-3">
-            <Link to="/login" className="text-red-500 hover:underline">Go to Login</Link>
-            <Link to="/register" className="text-red-500 hover:underline">Go to Register</Link>
+            <Link to="/login" className="text-[#b42318] hover:underline">Go to Login</Link>
+            <Link to="/register" className="text-[#b42318] hover:underline">Go to Register</Link>
           </div>
         </div>
       </div>
@@ -81,8 +81,8 @@ export function OtpVerificationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+    <div className="min-h-screen bg-gradient-to-br from-[#f7f1eb] via-white to-[#f8efe6] dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-white/95 dark:bg-gray-800 rounded-2xl border border-[#eadfce] shadow-[0_24px_60px_rgba(31,36,48,0.15)] p-6">
         <h1 className="text-2xl font-bold text-black dark:text-white mb-1">{PURPOSE_LABEL[purpose]}</h1>
         <p className="text-gray-600 dark:text-gray-300 mb-6">
           Enter the 6-digit OTP sent to <span className="font-medium">{email}</span>.
@@ -97,13 +97,13 @@ export function OtpVerificationPage() {
             placeholder="Enter 6-digit OTP"
             inputMode="numeric"
             maxLength={6}
-            className="w-full px-4 py-3 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white"
+            className="w-full px-4 py-3 rounded border border-[#d8cdbf] dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white focus:border-[#b42318] outline-none"
           />
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-red-500 text-white py-3 rounded hover:bg-red-600 transition-colors disabled:opacity-60"
+            className="w-full bg-[#b42318] text-white py-3 rounded hover:bg-[#8f1b12] transition-colors disabled:opacity-60"
           >
             {loading ? 'Verifying...' : 'Verify OTP'}
           </button>
@@ -113,7 +113,7 @@ export function OtpVerificationPage() {
           type="button"
           disabled={resending}
           onClick={handleResend}
-          className="w-full mt-3 text-red-500 hover:underline disabled:opacity-60"
+          className="w-full mt-3 text-[#b42318] hover:underline disabled:opacity-60"
         >
           {resending ? 'Resending...' : 'Resend OTP'}
         </button>

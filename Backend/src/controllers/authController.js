@@ -110,10 +110,12 @@ exports.login = async (req, res, next) => {
 
     const ip = req.ip;
     const lastIp = user.last_login_ip;
+    const isPrivilegedUser = user.role === 'admin' || Boolean(user.is_super_admin);
 
-    // Update last login IP
-    user.last_login_ip = ip;
-    await user.save();
+    if (isPrivilegedUser) {
+      await createOTP(user.email, 'login', user.id);
+      return res.json({ needOtp: true, message: 'Admin access requires OTP verification' });
+    }
 
     if (lastIp && lastIp !== ip) {
       // New device detected - send OTP
@@ -123,6 +125,8 @@ exports.login = async (req, res, next) => {
     }
 
     // Same device - login successful
+    user.last_login_ip = ip;
+    await user.save();
     const token = generateToken(user);
     res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, is_super_admin: user.is_super_admin } });
   } catch (err) {
@@ -142,6 +146,8 @@ exports.verifyLoginOTP = async (req, res, next) => {
 
     const user = await User.findByPk(verified.user_id);
     if (!user) return res.status(404).json({ error: 'User not found' });
+    user.last_login_ip = req.ip;
+    await user.save();
     const token = generateToken(user);
     res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, is_super_admin: user.is_super_admin } });
   } catch (err) {
