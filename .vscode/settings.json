@@ -1,0 +1,10 @@
+{
+  "css.lint.propertyIgnoredDueToDisplay": "ignore",
+  "css.lint.vendorPrefix": "ignore",
+  "files.exclude": {
+    "**/dist": true
+  },
+  "search.exclude": {
+    "**/dist": true
+  }
+}
