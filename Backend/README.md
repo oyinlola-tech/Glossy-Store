@@ -49,6 +49,8 @@ On `npm start`, the app will:
 ## Notes
 
 - Support attachments are private (signed download URL only).
+- OTP values are now stored as HMAC hashes (not plaintext).
+- Dedicated OTP verification page exists on frontend at `/otp`.
 - Optional virus scanning is controlled by:
   - `VIRUS_SCAN_ENABLED`
   - `VIRUS_SCAN_COMMAND`

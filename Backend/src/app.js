@@ -35,7 +35,11 @@ const trustProxy = (() => {
 })();
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  hsts: isProduction ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.set('trust proxy', trustProxy);
 app.disable('x-powered-by');
 app.use(cors({
