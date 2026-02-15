@@ -36,10 +36,16 @@ export function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f7f1eb] via-white to-[#f8efe6] dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 flex">
-      <div className="hidden lg:block lg:w-1/2 bg-gradient-to-br from-[#1f2430] via-[#5a140e] to-[#b42318]">
-        <div className="h-full flex items-center justify-center p-12">
-          <div className="text-center">
-            <div className="text-5xl mb-5 text-[#d4af37] font-bold tracking-[0.2em]">GLOSSY</div>
+      <div
+        className="hidden lg:block lg:w-1/2 bg-cover bg-center"
+        style={{
+          backgroundImage:
+            "url('https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=1400&q=80')",
+        }}
+      >
+        <div className="h-full w-full bg-black/55 flex items-center justify-center p-12">
+          <div className="text-center max-w-md">
+            <div className="text-5xl mb-5 text-[#f4d992] font-bold tracking-[0.2em]">GLOSSY</div>
             <h2 className="text-3xl font-bold text-white">Welcome to Glossy Store</h2>
             <p className="mt-4 text-gray-200">Elegant commerce with secure identity verification.</p>
           </div>

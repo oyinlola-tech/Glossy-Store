@@ -1,6 +1,7 @@
-import { createBrowserRouter, Navigate, Link } from 'react-router';
+import { createBrowserRouter, Navigate, Link, Outlet } from 'react-router';
 import { Footer } from './components/Footer';
 import { Header } from './components/Header';
+import { SupportChatWidget } from './components/SupportChatWidget';
 import { useAuth } from './contexts/AuthContext';
 import { AccountPage } from './pages/AccountPage';
 import { CartPage } from './pages/CartPage';
@@ -32,6 +33,15 @@ function MainLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1">{children}</main>
       <Footer />
     </div>
+  );
+}
+
+function RootLayout() {
+  return (
+    <>
+      <Outlet />
+      <SupportChatWidget />
+    </>
   );
 }
 
@@ -91,115 +101,121 @@ function NotFoundPage() {
 }
 
 export const router = createBrowserRouter([
-  { path: '/', element: <MainLayout><HomePage /></MainLayout> },
-  { path: '/login', element: <LoginPage /> },
-  { path: '/register', element: <RegisterPage /> },
-  { path: '/otp', element: <OtpVerificationPage /> },
-  { path: '/forgot-password', element: <ForgotPasswordPage /> },
-  { path: '/products', element: <MainLayout><ProductsPage /></MainLayout> },
-  { path: '/products/:id', element: <MainLayout><ProductDetailPage /></MainLayout> },
-  { path: '/cart', element: <MainLayout><CartPage /></MainLayout> },
   {
-    path: '/checkout',
-    element: <ProtectedRoute><MainLayout><CheckoutPage /></MainLayout></ProtectedRoute>,
+    path: '/',
+    element: <RootLayout />,
+    children: [
+      { index: true, element: <MainLayout><HomePage /></MainLayout> },
+      { path: 'login', element: <LoginPage /> },
+      { path: 'register', element: <RegisterPage /> },
+      { path: 'otp', element: <OtpVerificationPage /> },
+      { path: 'forgot-password', element: <ForgotPasswordPage /> },
+      { path: 'products', element: <MainLayout><ProductsPage /></MainLayout> },
+      { path: 'products/:id', element: <MainLayout><ProductDetailPage /></MainLayout> },
+      { path: 'cart', element: <MainLayout><CartPage /></MainLayout> },
+      {
+        path: 'checkout',
+        element: <ProtectedRoute><MainLayout><CheckoutPage /></MainLayout></ProtectedRoute>,
+      },
+      {
+        path: 'wishlist',
+        element: <ProtectedRoute><MainLayout><WishlistPage /></MainLayout></ProtectedRoute>,
+      },
+      {
+        path: 'account',
+        element: <ProtectedRoute><MainLayout><AccountPage /></MainLayout></ProtectedRoute>,
+      },
+      {
+        path: 'orders',
+        element: <ProtectedRoute><MainLayout><OrdersPage /></MainLayout></ProtectedRoute>,
+      },
+      { path: 'contact', element: <MainLayout><ContactPage /></MainLayout> },
+      { path: 'about', element: <AboutPage /> },
+      {
+        path: 'privacy',
+        element: <StaticInfoPage title="Privacy Policy" content="We process account and order data to deliver services securely. Contact support for privacy requests." />,
+      },
+      {
+        path: 'terms',
+        element: <StaticInfoPage title="Terms of Use" content="Using this platform means agreeing to applicable policies, lawful use, and payment/refund terms." />,
+      },
+      {
+        path: 'faq',
+        element: <StaticInfoPage title="FAQ" content="For product, shipping, payment, and account questions, contact support through the contact page." />,
+      },
+      {
+        path: 'admin/dashboard',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+            <MainLayout><AdminDashboard /></MainLayout>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'admin/products',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+            <MainLayout><AdminProductsPage /></MainLayout>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'admin/categories',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+            <MainLayout><AdminCategoriesPage /></MainLayout>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'admin/orders',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+            <MainLayout><AdminOrdersPage /></MainLayout>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'admin/users',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+            <MainLayout><AdminUsersPage /></MainLayout>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'superadmin/dashboard',
+        element: (
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            <MainLayout><SuperAdminDashboard /></MainLayout>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'superadmin/admins',
+        element: (
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            <MainLayout><SuperAdminAdminsPage /></MainLayout>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'superadmin/users',
+        element: (
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            <MainLayout><SuperAdminUsersPage /></MainLayout>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'superadmin/settings',
+        element: (
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            <MainLayout><SuperAdminSettingsPage /></MainLayout>
+          </ProtectedRoute>
+        ),
+      },
+      { path: '*', element: <NotFoundPage /> },
+    ],
   },
-  {
-    path: '/wishlist',
-    element: <ProtectedRoute><MainLayout><WishlistPage /></MainLayout></ProtectedRoute>,
-  },
-  {
-    path: '/account',
-    element: <ProtectedRoute><MainLayout><AccountPage /></MainLayout></ProtectedRoute>,
-  },
-  {
-    path: '/orders',
-    element: <ProtectedRoute><MainLayout><OrdersPage /></MainLayout></ProtectedRoute>,
-  },
-  { path: '/contact', element: <MainLayout><ContactPage /></MainLayout> },
-  { path: '/about', element: <AboutPage /> },
-  {
-    path: '/privacy',
-    element: <StaticInfoPage title="Privacy Policy" content="We process account and order data to deliver services securely. Contact support for privacy requests." />,
-  },
-  {
-    path: '/terms',
-    element: <StaticInfoPage title="Terms of Use" content="Using this platform means agreeing to applicable policies, lawful use, and payment/refund terms." />,
-  },
-  {
-    path: '/faq',
-    element: <StaticInfoPage title="FAQ" content="For product, shipping, payment, and account questions, contact support through the contact page." />,
-  },
-  {
-    path: '/admin/dashboard',
-    element: (
-      <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
-        <MainLayout><AdminDashboard /></MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/admin/products',
-    element: (
-      <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
-        <MainLayout><AdminProductsPage /></MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/admin/categories',
-    element: (
-      <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
-        <MainLayout><AdminCategoriesPage /></MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/admin/orders',
-    element: (
-      <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
-        <MainLayout><AdminOrdersPage /></MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/admin/users',
-    element: (
-      <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
-        <MainLayout><AdminUsersPage /></MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/superadmin/dashboard',
-    element: (
-      <ProtectedRoute allowedRoles={['superadmin']}>
-        <MainLayout><SuperAdminDashboard /></MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/superadmin/admins',
-    element: (
-      <ProtectedRoute allowedRoles={['superadmin']}>
-        <MainLayout><SuperAdminAdminsPage /></MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/superadmin/users',
-    element: (
-      <ProtectedRoute allowedRoles={['superadmin']}>
-        <MainLayout><SuperAdminUsersPage /></MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/superadmin/settings',
-    element: (
-      <ProtectedRoute allowedRoles={['superadmin']}>
-        <MainLayout><SuperAdminSettingsPage /></MainLayout>
-      </ProtectedRoute>
-    ),
-  },
-  { path: '*', element: <NotFoundPage /> },
 ]);
