@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { app, initializeDatabase } = require('./src/app');
 const { setupSupportSocket } = require('./src/socket/supportSocket');
+const { validateEnvironment } = require('./src/config/envValidation');
 
 const PORT = process.env.PORT || 5000;
 const allowedSocketOrigins = (process.env.SOCKET_CORS_ORIGIN || process.env.CORS_ALLOWED_ORIGINS || '')
@@ -19,7 +20,9 @@ const socketCorsOrigin = (origin, callback) => {
 };
 
 const startServer = async () => {
+  let server;
   try {
+    validateEnvironment();
     const allowStartWithoutDb = String(process.env.ALLOW_START_WITHOUT_DB || '').toLowerCase() === 'true';
     try {
       await initializeDatabase();
@@ -27,7 +30,7 @@ const startServer = async () => {
       if (!allowStartWithoutDb) throw dbErr;
       console.error('Database initialization failed. Starting in limited mode:', dbErr.message);
     }
-    const server = http.createServer(app);
+    server = http.createServer(app);
     const io = new Server(server, {
       cors: {
         origin: socketCorsOrigin,
@@ -41,6 +44,24 @@ const startServer = async () => {
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
+
+    const gracefulShutdown = (signal) => {
+      console.log(`Received ${signal}. Shutting down gracefully...`);
+      server.close((closeErr) => {
+        if (closeErr) {
+          console.error('HTTP server shutdown error:', closeErr);
+          process.exit(1);
+        }
+        process.exit(0);
+      });
+      setTimeout(() => {
+        console.error('Force shutdown after timeout');
+        process.exit(1);
+      }, 10000).unref();
+    };
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
   } catch (err) {
     console.error('Server startup failed:', err);
     process.exit(1);
