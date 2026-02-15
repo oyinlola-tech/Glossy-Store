@@ -17,6 +17,7 @@ interface AuthContextType {
   verifyLoginOTP: (email: string, otp: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   verifyOTP: (email: string, otp: string) => Promise<void>;
+  applyOAuth: (payload: { token: string; user: { id: string; name: string; email: string; role: UserRole; is_super_admin?: boolean } }) => void;
   logout: () => void;
   isLoading: boolean;
 }
@@ -110,6 +111,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('user', JSON.stringify(userData));
   };
 
+  const applyOAuth = (payload: { token: string; user: { id: string; name: string; email: string; role: UserRole; is_super_admin?: boolean } }) => {
+    const userData: User = {
+      id: String(payload.user.id),
+      name: payload.user.name,
+      email: payload.user.email,
+      role: toUserRole(payload.user.role === 'superadmin' ? 'admin' : (payload.user.role as 'user' | 'admin'), payload.user.is_super_admin),
+      token: payload.token,
+    };
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+  };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
@@ -117,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, verifyLoginOTP, register, verifyOTP, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, verifyLoginOTP, register, verifyOTP, applyOAuth, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

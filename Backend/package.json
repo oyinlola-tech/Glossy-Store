@@ -24,7 +24,6 @@
     "multer": "^2.0.2",
     "mysql2": "^3.17.1",
     "nodemailer": "^8.0.1",
-    "paystack": "^2.0.1",
     "passport": "^0.7.0",
     "passport-apple": "^2.0.2",
     "passport-google-oauth20": "^2.0.0",

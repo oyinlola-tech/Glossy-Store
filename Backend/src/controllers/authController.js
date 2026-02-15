@@ -286,7 +286,7 @@ exports.googleCallback = async (req, res) => {
   if (!authPayload?.token || !authPayload?.user) {
     return res.status(401).json({ error: 'Google authentication failed' });
   }
-  return res.json({
+  const payload = {
     token: authPayload.token,
     user: {
       id: authPayload.user.id,
@@ -295,7 +295,20 @@ exports.googleCallback = async (req, res) => {
       role: authPayload.user.role,
       is_super_admin: authPayload.user.is_super_admin,
     },
-  });
+  };
+  const baseUrl = process.env.APP_BASE_URL;
+  if (baseUrl) {
+    const params = new URLSearchParams({
+      token: payload.token,
+      id: String(payload.user.id),
+      name: payload.user.name,
+      email: payload.user.email,
+      role: payload.user.role,
+      is_super_admin: String(Boolean(payload.user.is_super_admin)),
+    });
+    return res.redirect(`${baseUrl}/auth/callback?${params.toString()}`);
+  }
+  return res.json(payload);
 };
 
 exports.appleCallback = async (req, res) => {
@@ -303,7 +316,7 @@ exports.appleCallback = async (req, res) => {
   if (!authPayload?.token || !authPayload?.user) {
     return res.status(401).json({ error: 'Apple authentication failed' });
   }
-  return res.json({
+  const payload = {
     token: authPayload.token,
     user: {
       id: authPayload.user.id,
@@ -312,5 +325,18 @@ exports.appleCallback = async (req, res) => {
       role: authPayload.user.role,
       is_super_admin: authPayload.user.is_super_admin,
     },
-  });
+  };
+  const baseUrl = process.env.APP_BASE_URL;
+  if (baseUrl) {
+    const params = new URLSearchParams({
+      token: payload.token,
+      id: String(payload.user.id),
+      name: payload.user.name,
+      email: payload.user.email,
+      role: payload.user.role,
+      is_super_admin: String(Boolean(payload.user.is_super_admin)),
+    });
+    return res.redirect(`${baseUrl}/auth/callback?${params.toString()}`);
+  }
+  return res.json(payload);
 };

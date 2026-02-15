@@ -2,22 +2,32 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
+import { Apple, Eye, EyeOff } from 'lucide-react';
 
 export function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
   const isValidEmail = /\S+@\S+\.\S+/.test(email.trim());
   const isStrongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
-  const isFormValid = name.trim().length >= 2 && isValidEmail && isStrongPassword;
+  const isFormValid = name.trim().length >= 2 && isValidEmail && isStrongPassword && password === confirmPassword;
+  const startGoogleAuth = () => {
+    window.location.href = '/api/auth/google';
+  };
+  const startAppleAuth = () => {
+    window.location.href = '/api/auth/apple';
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid) {
-      toast.error('Enter a valid name, email, and strong password');
+      toast.error('Enter a valid name, email, and matching strong passwords');
       return;
     }
     setLoading(true);
@@ -86,9 +96,9 @@ export function RegisterPage() {
                   className="w-full px-0 py-3 border-b-2 border-[#d8cdbf] dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-[#b42318] outline-none"
                 />
               </div>
-              <div>
+              <div className="relative">
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   aria-label="Password"
                   autoComplete="new-password"
@@ -96,8 +106,37 @@ export function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password"
-                  className="w-full px-0 py-3 border-b-2 border-[#d8cdbf] dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-[#b42318] outline-none"
+                  className="w-full pr-10 px-0 py-3 border-b-2 border-[#d8cdbf] dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-[#b42318] outline-none"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-0 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type={showConfirm ? 'text' : 'password'}
+                  required
+                  aria-label="Confirm password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm password"
+                  className="w-full pr-10 px-0 py-3 border-b-2 border-[#d8cdbf] dark:border-gray-700 bg-transparent text-black dark:text-white placeholder-gray-400 focus:border-[#b42318] outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((prev) => !prev)}
+                  className="absolute right-0 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirm ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                </button>
               </div>
             </div>
 
@@ -105,6 +144,9 @@ export function RegisterPage() {
               <p className="text-xs text-[#b42318]">
                 Password must be at least 8 characters with uppercase, lowercase, and a number.
               </p>
+            ) : null}
+            {confirmPassword && password !== confirmPassword ? (
+              <p className="text-xs text-[#b42318]">Passwords do not match.</p>
             ) : null}
 
             <button
@@ -114,6 +156,30 @@ export function RegisterPage() {
             >
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={startGoogleAuth}
+                className="w-full border border-gray-200 dark:border-gray-700 text-black dark:text-white py-3 rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-semibold flex items-center justify-center gap-2"
+              >
+                <svg className="size-5" viewBox="0 0 48 48" aria-hidden="true">
+                  <path fill="#FFC107" d="M43.6 20.3H42V20H24v8h11.3C33.8 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.2 6 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.7z"/>
+                  <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.6 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.2 6 29.4 4 24 4c-7.7 0-14.4 4.4-17.7 10.7z"/>
+                  <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.4 35.1 26.8 36 24 36c-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+                  <path fill="#1976D2" d="M43.6 20.3H42V20H24v8h11.3c-1.2 3.2-3.7 5.8-7 7.3l6.3 5.3C37.1 38.3 44 33 44 24c0-1.3-.1-2.4-.4-3.7z"/>
+                </svg>
+                Continue with Google
+              </button>
+              <button
+                type="button"
+                onClick={startAppleAuth}
+                className="w-full border border-gray-200 dark:border-gray-700 text-black dark:text-white py-3 rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-semibold flex items-center justify-center gap-2"
+              >
+                <Apple className="size-5" />
+                Continue with Apple
+              </button>
+            </div>
 
             <div className="text-center">
               <p className="text-gray-600 dark:text-gray-400">

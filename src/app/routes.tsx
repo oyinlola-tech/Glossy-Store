@@ -12,6 +12,7 @@ import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { OtpVerificationPage } from './pages/OtpVerificationPage';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { PaymentVerifyPage } from './pages/PaymentVerifyPage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
 import { ProductsPage } from './pages/ProductsPage';
@@ -109,6 +110,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <MainLayout><HomePage /></MainLayout> },
       { path: 'login', element: <LoginPage /> },
+      { path: 'auth/callback', element: <AuthCallbackPage /> },
       { path: 'register', element: <RegisterPage /> },
       { path: 'otp', element: <OtpVerificationPage /> },
       { path: 'payment/verify', element: <PaymentVerifyPage /> },
