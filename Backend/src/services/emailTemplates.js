@@ -162,7 +162,7 @@ const renderPaymentReceiptTemplate = ({ name, email, amount, currency, status, r
     body: `
       <h2 style="margin:0 0 12px 0;color:${t.textPrimary};">Hello ${safeName},</h2>
       <p style="margin:0 0 14px 0;color:${t.textSecondary};line-height:1.6;">
-        We received a payment event from Paystack. Here are the details:
+        We received a payment event from Squad. Here are the details:
       </p>
       <table style="width:100%;border-collapse:collapse;margin:16px 0;">
         <tr>

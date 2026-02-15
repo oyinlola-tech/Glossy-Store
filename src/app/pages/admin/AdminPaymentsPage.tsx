@@ -4,21 +4,23 @@ import * as api from '../../services/api';
 import { formatCurrency } from '../../utils/currency';
 
 const EVENT_OPTIONS = [
-  'charge.success',
+  'SuccessfulDispute',
+  'CreatedDispute',
+  'ReminderDispute',
+  'SuccessfulInvoice',
+  'CreatedInvoice',
+  'FailedInvoice',
+  'UpdatedPaymentRequest',
+  'PendingPaymentRequest',
+  'SuccessfulRefund',
+  'FailedRefund',
+  'PendingRefund',
+  'ProcessedRefund',
+  'TransactionSuccessful',
+  'charge.successful',
   'charge.failed',
-  'dispute.create',
-  'dispute.resolve',
-  'dispute.reminder',
-  'invoice.create',
-  'invoice.update',
-  'invoice.payment_failed',
-  'paymentrequest.pending',
-  'paymentrequest.success',
-  'refund.pending',
-  'refund.failed',
-  'refund.processed',
-  'transfer.success',
   'transaction.success',
+  'refund.processed',
 ];
 
 export function AdminPaymentsPage() {
@@ -49,7 +51,7 @@ export function AdminPaymentsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-black dark:text-white">Payment Events</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Live Paystack event logs and receipts.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Live Squad event logs and receipts.</p>
         </div>
         <select
           value={filter}

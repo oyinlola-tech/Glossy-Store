@@ -15,15 +15,15 @@ const safeEqualHex = (expectedHex, receivedHex) => {
 
 exports.webhook = async (req, res) => {
   try {
-    const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
-    if (!paystackSecret && process.env.NODE_ENV === 'production') {
+    const squadSecret = process.env.SQUAD_SECRET_KEY;
+    if (!squadSecret && process.env.NODE_ENV === 'production') {
       return res.status(500).json({ error: 'Webhook secret is not configured' });
     }
 
-    if (paystackSecret) {
-      const signature = req.headers['x-paystack-signature'] || '';
+    if (squadSecret) {
+      const signature = req.headers['x-squad-signature'] || '';
       const expected = crypto
-        .createHmac('sha512', paystackSecret)
+        .createHmac('sha512', squadSecret)
         .update(req.rawBody || JSON.stringify(req.body))
         .digest('hex');
       if (!safeEqualHex(expected, signature)) {
@@ -32,16 +32,17 @@ exports.webhook = async (req, res) => {
     }
 
     const event = req.body;
-    const data = event?.data || {};
+    const eventType = event?.Event || event?.event || 'unknown';
+    const data = event?.Body || event?.data || {};
     const customer = data?.customer || {};
-    const reference = data?.reference || null;
+    const reference = data?.transaction_ref || data?.reference || null;
     const amount = typeof data?.amount === 'number' ? data.amount / 100 : null;
     const currency = data?.currency || null;
     const status = data?.status || null;
     const occurredAt = data?.paid_at || data?.created_at || null;
 
     await PaystackEvent.create({
-      event: event.event,
+      event: eventType,
       reference,
       status,
       amount,
@@ -52,10 +53,10 @@ exports.webhook = async (req, res) => {
       payload: event,
     });
 
-    if (event.event === 'charge.success' && data?.status === 'success') {
-      const orderId = Number(event?.data?.metadata?.orderId);
+    if ((eventType === 'charge.successful' || eventType === 'transaction.success' || status === 'success') && data?.status === 'success') {
+      const orderId = Number(data?.metadata?.orderId);
       if (!Number.isInteger(orderId) || orderId <= 0) {
-        return res.sendStatus(200);
+        return res.status(200).json({ received: true });
       }
       const order = await Order.findByPk(orderId);
       if (order) {
@@ -66,19 +67,19 @@ exports.webhook = async (req, res) => {
     }
 
     if (customer?.email) {
-      const label = event.event.replace(/\./g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const label = String(eventType).replace(/\./g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
       await sendPaymentReceiptEmail({
         email: customer.email,
         name: customer?.first_name || customer?.email,
         amount,
         currency,
-        status: status || event.event,
+        status: status || eventType,
         reference,
         eventLabel: label,
         occurredAt,
       });
     }
-    return res.sendStatus(200);
+    return res.status(200).json({ received: true });
   } catch (err) {
     return res.status(500).json({ error: 'Webhook processing failed' });
   }
@@ -90,7 +91,8 @@ exports.verify = async (req, res) => {
     if (!reference) return res.status(400).json({ error: 'Reference is required' });
 
     const payload = await verifyTransaction(reference);
-    const data = payload?.data;
+    const data = payload?.data || payload?.Body || payload?.body || {};
+    const status = data?.status || payload?.status;
     const customer = data?.customer || {};
     const amount = typeof data?.amount === 'number' ? data.amount / 100 : null;
     const currency = data?.currency || null;
@@ -99,7 +101,7 @@ exports.verify = async (req, res) => {
     await PaystackEvent.create({
       event: data?.gateway_response ? `verify.${data?.status || 'unknown'}` : 'verify',
       reference,
-      status: data?.status || null,
+      status: status || null,
       amount,
       currency,
       customer_email: customer?.email || null,
@@ -108,7 +110,7 @@ exports.verify = async (req, res) => {
       payload,
     });
 
-    if (data?.status === 'success') {
+    if (status === 'success') {
       const orderId = Number(data?.metadata?.orderId);
       if (Number.isInteger(orderId) && orderId > 0) {
         const order = await Order.findByPk(orderId);
@@ -126,14 +128,14 @@ exports.verify = async (req, res) => {
         name: customer?.first_name || customer?.email,
         amount,
         currency,
-        status: data?.status || 'unknown',
+        status: status || 'unknown',
         reference,
         eventLabel: label,
         occurredAt,
       });
     }
 
-    return res.json({ status: data?.status || 'unknown', reference, data });
+    return res.json({ status: status || 'unknown', reference, data });
   } catch (err) {
     return res.status(500).json({ error: 'Verification failed' });
   }

@@ -8,6 +8,7 @@ router.get('/discount-preview', authMiddleware, orderController.getDiscountPrevi
 router.get('/', authMiddleware, orderController.getUserOrders);
 router.get('/:id/status', authMiddleware, orderController.getOrderStatus);
 router.patch('/:id/cancel', authMiddleware, orderController.cancelOrder);
+router.post('/:id/chargeback', authMiddleware, orderController.requestChargeback);
 router.get('/:id', authMiddleware, orderController.getOrderDetails);
 
 module.exports = router;

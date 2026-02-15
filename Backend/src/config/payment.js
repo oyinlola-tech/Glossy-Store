@@ -1,9 +1,10 @@
-// Paystack configuration
+// Squad configuration
 module.exports = {
-  paystackSecret: process.env.PAYSTACK_SECRET_KEY,
-  paystackPublic: process.env.PAYSTACK_PUBLIC_KEY,
-  paystackApiUrl: process.env.PAYSTACK_API_URL || 'https://api.paystack.co',
-  paystackWebhookSecret: process.env.PAYSTACK_WEBHOOK_SECRET,
-  paystackWebhookUrl: process.env.PAYSTACK_WEBHOOK_URL,
-  
+  squadSecret: process.env.SQUAD_SECRET_KEY,
+  squadPublic: process.env.SQUAD_PUBLIC_KEY,
+  squadApiUrl: process.env.SQUAD_API_URL ||
+    (process.env.NODE_ENV === 'production' ? 'https://api-d.squadco.com' : 'https://sandbox-api-d.squadco.com'),
+  squadWebhookSecret: process.env.SQUAD_WEBHOOK_SECRET,
+  squadWebhookUrl: process.env.SQUAD_WEBHOOK_URL,
+  squadCallbackUrl: process.env.SQUAD_CALLBACK_URL,
 };

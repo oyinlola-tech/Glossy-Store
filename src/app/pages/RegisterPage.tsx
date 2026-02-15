@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
-import { Apple, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
 export function RegisterPage() {
   const [name, setName] = useState('');
@@ -176,7 +176,12 @@ export function RegisterPage() {
                 onClick={startAppleAuth}
                 className="w-full border border-gray-200 dark:border-gray-700 text-black dark:text-white py-3 rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-semibold flex items-center justify-center gap-2"
               >
-                <Apple className="size-5" />
+                <svg className="size-5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M16.7 1.9c-1 .1-2.2.7-2.9 1.6-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.5.7-.8 1.1-1.9 1-3.1zM20.2 9.2c-1.3-1.6-3.1-1.8-3.8-1.8-1.6 0-3.1 1-3.9 1s-2.1-1-3.4-1c-1.8 0-3.5 1-4.4 2.5-1.9 3-0.5 7.5 1.3 10 0.9 1.2 2 2.6 3.4 2.5 1.4-.1 1.9-.9 3.6-.9s2.1.9 3.5.9c1.5 0 2.4-1.2 3.3-2.4 1-1.4 1.4-2.7 1.4-2.8-.1 0-2.7-1-2.7-4 0-2.5 2.1-3.7 2.2-3.8-.1-.1-1-1.4-2.5-2.2z"
+                  />
+                </svg>
                 Continue with Apple
               </button>
             </div>

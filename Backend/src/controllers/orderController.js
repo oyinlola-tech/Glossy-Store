@@ -2,6 +2,15 @@ const { Order, OrderItem, Cart, CartItem, Coupon, ProductVariant, Product, User,
 const { initializeTransaction } = require('../services/paymentService');
 const { Op } = require('sequelize');
 const crypto = require('crypto');
+const {
+  checkoutSchema,
+  orderIdParamSchema,
+  chargebackSchema,
+} = require('../validations/orderValidation');
+
+const CHARGEBACK_REQUIRES_DISPUTE_STATUSES = new Set(['out_for_delivery', 'delivered']);
+const validateBody = (schema, body) => schema.validate(body, { abortEarly: true, stripUnknown: true });
+const validateParams = (schema, params) => schema.validate(params, { abortEarly: true, convert: true, stripUnknown: true });
 
 const calculateItemPrice = (variant) => {
   const basePrice = Number(variant.Product.base_price);
@@ -94,7 +103,9 @@ exports.getDiscountPreview = async (req, res, next) => {
 
 exports.checkout = async (req, res, next) => {
   try {
-    const { shippingAddress, couponCode, currency } = req.body;
+    const { error, value } = validateBody(checkoutSchema, req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+    const { shippingAddress, couponCode, currency } = value;
     const userId = req.user.id;
 
     // Get user's cart
@@ -232,7 +243,7 @@ exports.checkout = async (req, res, next) => {
     if (!['NGN', 'USD'].includes(normalizedCurrency)) {
       return res.status(400).json({ error: 'Unsupported currency. Use NGN or USD.' });
     }
-    const callbackUrl = process.env.PAYSTACK_CALLBACK_URL || `${process.env.APP_BASE_URL || ''}/payment/verify`;
+    const callbackUrl = process.env.SQUAD_CALLBACK_URL || `${process.env.APP_BASE_URL || ''}/payment/verify`;
     const paymentData = await initializeTransaction(
       req.user.email,
       checkoutResult.total,
@@ -260,8 +271,10 @@ exports.checkout = async (req, res, next) => {
 
 exports.cancelOrder = async (req, res, next) => {
   try {
+    const { error, value } = validateParams(orderIdParamSchema, req.params);
+    if (error) return res.status(400).json({ error: error.details[0].message });
     const order = await Order.findOne({
-      where: { id: req.params.id, user_id: req.user.id },
+      where: { id: value.id, user_id: req.user.id },
       include: [{ model: OrderItem, include: [{ model: ProductVariant }] }],
     });
     if (!order) return res.status(404).json({ error: 'Order not found' });
@@ -289,6 +302,65 @@ exports.cancelOrder = async (req, res, next) => {
   }
 };
 
+exports.requestChargeback = async (req, res, next) => {
+  try {
+    const paramValidation = validateParams(orderIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const bodyValidation = validateBody(chargebackSchema, req.body);
+    if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
+
+    const order = await Order.findOne({
+      where: { id: paramValidation.value.id, user_id: req.user.id },
+    });
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.payment_status !== 'success') {
+      return res.status(400).json({ error: 'Chargeback is only available for successful payments' });
+    }
+    if (order.status === 'refunded') {
+      return res.status(400).json({ error: 'Order is already refunded' });
+    }
+    if (order.dispute_status === 'pending') {
+      return res.status(409).json({ error: 'A dispute is already pending for this order' });
+    }
+
+    const reason = bodyValidation.value?.reason ? String(bodyValidation.value.reason).trim() : null;
+
+    if (CHARGEBACK_REQUIRES_DISPUTE_STATUSES.has(order.status)) {
+      order.dispute_status = 'pending';
+      order.dispute_reason = reason;
+      order.dispute_requested_at = new Date();
+      order.dispute_resolved_at = null;
+      order.dispute_resolution_note = null;
+      order.status_note = 'Dispute raised by customer. Awaiting admin decision on chargeback.';
+      await order.save();
+
+      return res.status(202).json({
+        message: 'Dispute created. Admin will decide whether to issue chargeback.',
+        order,
+      });
+    }
+
+    order.status = 'refunded';
+    order.refunded_at = new Date();
+    order.dispute_status = 'none';
+    order.dispute_reason = null;
+    order.dispute_requested_at = null;
+    order.dispute_resolved_at = null;
+    order.dispute_resolution_note = null;
+    order.status_note = reason
+      ? `Chargeback issued before delivery: ${reason}`
+      : 'Chargeback issued before delivery';
+    await order.save();
+
+    return res.json({
+      message: 'Chargeback issued successfully',
+      order,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 exports.getUserOrders = async (req, res, next) => {
   try {
     const orders = await Order.findAll({
@@ -307,8 +379,10 @@ exports.getUserOrders = async (req, res, next) => {
 
 exports.getOrderDetails = async (req, res, next) => {
   try {
+    const { error, value } = validateParams(orderIdParamSchema, req.params);
+    if (error) return res.status(400).json({ error: error.details[0].message });
     const order = await Order.findOne({
-      where: { id: req.params.id, user_id: req.user.id },
+      where: { id: value.id, user_id: req.user.id },
       include: [
         { model: User, attributes: ['id', 'name', 'email'] },
         { model: OrderItem, include: [{ model: ProductVariant, include: [{ model: Product }] }] },
@@ -323,14 +397,21 @@ exports.getOrderDetails = async (req, res, next) => {
 
 exports.getOrderStatus = async (req, res, next) => {
   try {
+    const { error, value } = validateParams(orderIdParamSchema, req.params);
+    if (error) return res.status(400).json({ error: error.details[0].message });
     const order = await Order.findOne({
-      where: { id: req.params.id, user_id: req.user.id },
+      where: { id: value.id, user_id: req.user.id },
       attributes: [
         'id',
         'order_number',
         'status',
         'status_note',
         'payment_status',
+        'dispute_status',
+        'dispute_reason',
+        'dispute_requested_at',
+        'dispute_resolved_at',
+        'dispute_resolution_note',
         'out_for_delivery_at',
         'delivered_at',
         'cancelled_at',

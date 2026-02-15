@@ -216,7 +216,7 @@ export function CheckoutPage() {
           <div className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-900 p-6 shadow-2xl">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h2 className="text-xl font-bold text-black dark:text-white">Pay with Paystack</h2>
+            <h2 className="text-xl font-bold text-black dark:text-white">Pay with Squad</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Choose your payment currency</p>
               </div>
               <button onClick={() => setPaymentOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
@@ -260,7 +260,7 @@ export function CheckoutPage() {
               }}
               className="w-full bg-red-500 text-white py-3 rounded hover:bg-red-600 disabled:opacity-50 font-semibold"
             >
-              {loading ? 'Processing...' : 'Continue to Paystack'}
+              {loading ? 'Processing...' : 'Continue to Squad'}
             </button>
           </div>
         </div>

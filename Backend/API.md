@@ -49,6 +49,7 @@ This file is generated from `src/config/swagger.js` to keep endpoint docs 1:1 wi
 | GET | `/orders/{id}` | `getOrdersId` | Orders | Yes | Order details |
 | GET | `/orders/{id}/status` | `getOrdersIdStatus` | Orders | Yes | Order status |
 | PATCH | `/orders/{id}/cancel` | `patchOrdersIdCancel` | Orders | Yes | Cancel order |
+| POST | `/orders/{id}/chargeback` | `postOrdersIdChargeback` | Orders | Yes | Request chargeback or create dispute |
 | GET | `/support/conversations` | `getSupportConversations` | Support | Yes | List support conversations |
 | POST | `/support/conversations` | `postSupportConversations` | Support | Yes | Create support conversation |
 | GET | `/support/unread-count` | `getSupportUnreadCount` | Support | Yes | Unread support count |
@@ -84,6 +85,7 @@ This file is generated from `src/config/swagger.js` to keep endpoint docs 1:1 wi
 | GET | `/admin/users` | `getAdminUsers` | Admin | Yes | List users |
 | GET | `/admin/orders` | `getAdminOrders` | Admin | Yes | List orders |
 | PATCH | `/admin/orders/{id}/status` | `patchAdminOrdersIdStatus` | Admin | Yes | Update order status |
+| PATCH | `/admin/orders/{id}/dispute` | `patchAdminOrdersIdDispute` | Admin | Yes | Resolve order dispute |
 
 ## Notes
 - Use Swagger UI for full request/response examples: `/api/docs`.

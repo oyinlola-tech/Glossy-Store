@@ -425,6 +425,44 @@ exports.updateOrderStatus = async (req, res, next) => {
   }
 };
 
+exports.resolveOrderDispute = async (req, res, next) => {
+  try {
+    const { decision, note } = req.body;
+    const allowedDecisions = ['approve_chargeback', 'reject_chargeback'];
+    if (!allowedDecisions.includes(decision)) {
+      return res.status(400).json({ error: 'Invalid decision. Use approve_chargeback or reject_chargeback.' });
+    }
+
+    const order = await Order.findByPk(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.dispute_status !== 'pending') {
+      return res.status(400).json({ error: 'No pending dispute found for this order' });
+    }
+
+    const resolutionNote = note ? String(note).trim() : null;
+    const resolvedAt = new Date();
+
+    if (decision === 'approve_chargeback') {
+      order.status = 'refunded';
+      order.refunded_at = resolvedAt;
+      order.dispute_status = 'approved';
+      order.dispute_resolved_at = resolvedAt;
+      order.dispute_resolution_note = resolutionNote || 'Dispute approved. Chargeback issued by admin.';
+      order.status_note = order.dispute_resolution_note;
+    } else {
+      order.dispute_status = 'rejected';
+      order.dispute_resolved_at = resolvedAt;
+      order.dispute_resolution_note = resolutionNote || 'Dispute rejected. No chargeback issued.';
+      order.status_note = order.dispute_resolution_note;
+    }
+
+    await order.save();
+    return res.json(order);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 exports.getPaymentEvents = async (req, res, next) => {
   try {
     const { event } = req.query;

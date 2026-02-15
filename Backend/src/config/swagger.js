@@ -205,6 +205,16 @@ const swaggerSpec = {
     '/orders/{id}': { get: { tags: ['Orders'], summary: 'Order details', security: [{ bearerAuth: [] }], parameters: [pathIdParam], responses: authResponses({ id: 1, status: 'paid' }) } },
     '/orders/{id}/status': { get: { tags: ['Orders'], summary: 'Order status', security: [{ bearerAuth: [] }], parameters: [pathIdParam], responses: authResponses({ id: 1, status: 'out_for_delivery' }) } },
     '/orders/{id}/cancel': { patch: { tags: ['Orders'], summary: 'Cancel order', security: [{ bearerAuth: [] }], parameters: [pathIdParam], responses: authResponses({ message: 'Order cancelled successfully' }) } },
+    '/orders/{id}/chargeback': {
+      post: {
+        tags: ['Orders'],
+        summary: 'Request chargeback or create dispute',
+        security: [{ bearerAuth: [] }],
+        parameters: [pathIdParam],
+        requestBody: { required: false, content: jsonContent({ type: 'object' }) },
+        responses: authResponses({ message: 'Chargeback issued successfully', order: { id: 1, status: 'refunded' } }),
+      },
+    },
 
     '/support/conversations': {
       post: {
@@ -291,6 +301,16 @@ const swaggerSpec = {
     '/admin/users': { get: { tags: ['Admin'], summary: 'List users', security: [{ bearerAuth: [] }], responses: authResponses([]) } },
     '/admin/orders': { get: { tags: ['Admin'], summary: 'List orders', security: [{ bearerAuth: [] }], responses: authResponses([]) } },
     '/admin/orders/{id}/status': { patch: { tags: ['Admin'], summary: 'Update order status', security: [{ bearerAuth: [] }], parameters: [pathIdParam], requestBody: { required: true, content: jsonContent({ type: 'object' }) }, responses: authResponses({ id: 1, status: 'delivered' }) } },
+    '/admin/orders/{id}/dispute': {
+      patch: {
+        tags: ['Admin'],
+        summary: 'Resolve order dispute',
+        security: [{ bearerAuth: [] }],
+        parameters: [pathIdParam],
+        requestBody: { required: true, content: jsonContent({ type: 'object' }) },
+        responses: authResponses({ id: 1, dispute_status: 'approved', status: 'refunded' }),
+      },
+    },
   },
 };
 

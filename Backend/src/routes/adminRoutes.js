@@ -45,6 +45,7 @@ router.get('/users', adminController.getUsers);
 // Orders
 router.get('/orders', adminController.getOrders);
 router.patch('/orders/:id/status', adminController.updateOrderStatus);
+router.patch('/orders/:id/dispute', adminController.resolveOrderDispute);
 
 // Payments
 router.get('/payments/events', adminController.getPaymentEvents);

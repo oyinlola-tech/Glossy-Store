@@ -67,6 +67,27 @@ const Order = sequelize.define('Order', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+  dispute_status: {
+    type: DataTypes.ENUM('none', 'pending', 'approved', 'rejected'),
+    allowNull: false,
+    defaultValue: 'none',
+  },
+  dispute_reason: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  dispute_requested_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  dispute_resolved_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  dispute_resolution_note: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
 }, {
   timestamps: true,
   underscored: true,
