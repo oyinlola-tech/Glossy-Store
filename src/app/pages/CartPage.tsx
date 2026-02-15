@@ -4,6 +4,7 @@ import { Minus, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import * as api from '../services/api';
+import { formatCurrency } from '../utils/currency';
 
 type LocalCartItem = {
   id: string | number;
@@ -174,7 +175,7 @@ export function CartPage() {
                         {item.variantLabel ? <p className="text-sm text-gray-500 dark:text-gray-400">{item.variantLabel}</p> : null}
                       </div>
                     </div>
-                    <div className="text-gray-600 dark:text-gray-400">${item.unitPrice.toFixed(2)}</div>
+                    <div className="text-gray-600 dark:text-gray-400">{formatCurrency(item.unitPrice)}</div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
@@ -191,7 +192,7 @@ export function CartPage() {
                       </button>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-black dark:text-white font-semibold">${item.subtotal.toFixed(2)}</span>
+                      <span className="text-black dark:text-white font-semibold">{formatCurrency(item.subtotal)}</span>
                       <button onClick={() => removeItem(item.id)} className="text-red-500 hover:text-red-600">
                         <Trash2 className="size-5" />
                       </button>
@@ -222,19 +223,19 @@ export function CartPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                     <span className="text-black dark:text-white">Subtotal:</span>
-                    <span className="text-black dark:text-white">${cart.subtotal.toFixed(2)}</span>
+                    <span className="text-black dark:text-white">{formatCurrency(cart.subtotal)}</span>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                     <span className="text-black dark:text-white">Shipping:</span>
-                    <span className="text-black dark:text-white">{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
+                    <span className="text-black dark:text-white">{shipping === 0 ? 'Free' : formatCurrency(shipping)}</span>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                     <span className="text-black dark:text-white">Discount:</span>
-                    <span className="text-black dark:text-white">-${couponDiscount.toFixed(2)}</span>
+                    <span className="text-black dark:text-white">-{formatCurrency(couponDiscount)}</span>
                   </div>
                   <div className="flex items-center justify-between py-2">
                     <span className="text-black dark:text-white font-semibold">Total:</span>
-                    <span className="text-black dark:text-white font-semibold">${total.toFixed(2)}</span>
+                    <span className="text-black dark:text-white font-semibold">{formatCurrency(total)}</span>
                   </div>
                 </div>
                 <button onClick={handleCheckout} disabled={!cart.items.length} className="w-full mt-6 bg-red-500 text-white py-3 rounded hover:bg-red-600 font-semibold disabled:opacity-50">

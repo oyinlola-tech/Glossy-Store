@@ -12,6 +12,7 @@ const paymentRoutes = require('./paymentRoutes');
 const couponRoutes = require('./couponRoutes');
 const supportRoutes = require('./supportRoutes');
 const categoryRoutes = require('./categoryRoutes');
+const currencyRoutes = require('./currencyRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/user', userRoutes);
@@ -24,5 +25,6 @@ router.use('/payments', paymentRoutes);
 router.use('/coupons', couponRoutes);
 router.use('/support', supportRoutes);
 router.use('/categories', categoryRoutes);
+router.use('/currency', currencyRoutes);
 
 module.exports = router;

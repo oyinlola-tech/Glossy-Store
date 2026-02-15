@@ -1,5 +1,5 @@
 const config = require('../config/payment');
-const initializeTransaction = async (email, amount, reference, metadata = {}) => {
+const initializeTransaction = async (email, amount, reference, metadata = {}, currency = 'NGN', callbackUrl = undefined) => {
   const response = await fetch(`${config.paystackApiUrl}/transaction/initialize`, {
     method: 'POST',
     headers: {
@@ -11,6 +11,8 @@ const initializeTransaction = async (email, amount, reference, metadata = {}) =>
       amount: amount * 100,
       reference,
       metadata,
+      currency,
+      callback_url: callbackUrl,
     }),
   });
 

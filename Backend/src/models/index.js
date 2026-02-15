@@ -24,6 +24,7 @@ const SupportConversation = require('./SupportConversation');
 const SupportMessage = require('./SupportMessage');
 const SupportMessageAttachment = require('./SupportMessageAttachment');
 const SupportMessageReceipt = require('./SupportMessageReceipt');
+const PaystackEvent = require('./PaystackEvent');
 
 // User associations
 User.hasMany(OTP, { foreignKey: 'user_id' });
@@ -164,4 +165,5 @@ module.exports = {
   SupportMessage,
   SupportMessageAttachment,
   SupportMessageReceipt,
+  PaystackEvent,
 };

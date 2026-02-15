@@ -107,7 +107,7 @@ const initializeDatabase = async () => {
   await sequelize.authenticate();
   const autoSync = String(process.env.AUTO_SYNC_MODELS || 'true').toLowerCase() === 'true';
   if (autoSync) {
-    await sequelize.sync();
+    await sequelize.sync({ alter: true });
   }
   const autoMigrate = String(process.env.AUTO_RUN_MIGRATIONS || 'true').toLowerCase() === 'true';
   if (autoMigrate) {

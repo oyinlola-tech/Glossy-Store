@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import * as api from '../../services/api';
+import { formatCurrency } from '../../utils/currency';
 
 const STATUSES = ['pending', 'paid', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'refunded'];
 
@@ -42,7 +43,7 @@ export function AdminOrdersPage() {
           <div key={order.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow flex items-center justify-between gap-4">
             <div>
               <p className="font-semibold text-black dark:text-white">#{order.order_number}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">${Number(order.total || 0).toFixed(2)}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{formatCurrency(Number(order.total || 0))}</p>
             </div>
             <select
               value={order.status}

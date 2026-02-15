@@ -1,5 +1,7 @@
 const crypto = require('crypto');
-const { Order } = require('../models');
+const { Order, PaystackEvent } = require('../models');
+const { verifyTransaction } = require('../services/paymentService');
+const { sendPaymentReceiptEmail } = require('../services/emailService');
 
 const safeEqualHex = (expectedHex, receivedHex) => {
   if (!expectedHex || !receivedHex) return false;
@@ -30,7 +32,27 @@ exports.webhook = async (req, res) => {
     }
 
     const event = req.body;
-    if (event.event === 'charge.success' && event?.data?.status === 'success') {
+    const data = event?.data || {};
+    const customer = data?.customer || {};
+    const reference = data?.reference || null;
+    const amount = typeof data?.amount === 'number' ? data.amount / 100 : null;
+    const currency = data?.currency || null;
+    const status = data?.status || null;
+    const occurredAt = data?.paid_at || data?.created_at || null;
+
+    await PaystackEvent.create({
+      event: event.event,
+      reference,
+      status,
+      amount,
+      currency,
+      customer_email: customer?.email || null,
+      customer_name: customer?.first_name ? `${customer.first_name} ${customer.last_name || ''}`.trim() : customer?.email || null,
+      occurred_at: occurredAt ? new Date(occurredAt) : null,
+      payload: event,
+    });
+
+    if (event.event === 'charge.success' && data?.status === 'success') {
       const orderId = Number(event?.data?.metadata?.orderId);
       if (!Number.isInteger(orderId) || orderId <= 0) {
         return res.sendStatus(200);
@@ -42,8 +64,77 @@ exports.webhook = async (req, res) => {
         await order.save();
       }
     }
+
+    if (customer?.email) {
+      const label = event.event.replace(/\./g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      await sendPaymentReceiptEmail({
+        email: customer.email,
+        name: customer?.first_name || customer?.email,
+        amount,
+        currency,
+        status: status || event.event,
+        reference,
+        eventLabel: label,
+        occurredAt,
+      });
+    }
     return res.sendStatus(200);
   } catch (err) {
     return res.status(500).json({ error: 'Webhook processing failed' });
+  }
+};
+
+exports.verify = async (req, res) => {
+  try {
+    const reference = req.params.reference || req.query.reference;
+    if (!reference) return res.status(400).json({ error: 'Reference is required' });
+
+    const payload = await verifyTransaction(reference);
+    const data = payload?.data;
+    const customer = data?.customer || {};
+    const amount = typeof data?.amount === 'number' ? data.amount / 100 : null;
+    const currency = data?.currency || null;
+    const occurredAt = data?.paid_at || data?.created_at || null;
+
+    await PaystackEvent.create({
+      event: data?.gateway_response ? `verify.${data?.status || 'unknown'}` : 'verify',
+      reference,
+      status: data?.status || null,
+      amount,
+      currency,
+      customer_email: customer?.email || null,
+      customer_name: customer?.first_name ? `${customer.first_name} ${customer.last_name || ''}`.trim() : customer?.email || null,
+      occurred_at: occurredAt ? new Date(occurredAt) : null,
+      payload,
+    });
+
+    if (data?.status === 'success') {
+      const orderId = Number(data?.metadata?.orderId);
+      if (Number.isInteger(orderId) && orderId > 0) {
+        const order = await Order.findByPk(orderId);
+        if (order) {
+          order.payment_status = 'success';
+          if (order.status === 'pending') order.status = 'paid';
+          await order.save();
+        }
+      }
+    }
+    if (customer?.email) {
+      const label = data?.gateway_response || 'Transaction Update';
+      await sendPaymentReceiptEmail({
+        email: customer.email,
+        name: customer?.first_name || customer?.email,
+        amount,
+        currency,
+        status: data?.status || 'unknown',
+        reference,
+        eventLabel: label,
+        occurredAt,
+      });
+    }
+
+    return res.json({ status: data?.status || 'unknown', reference, data });
+  } catch (err) {
+    return res.status(500).json({ error: 'Verification failed' });
   }
 };

@@ -44,7 +44,7 @@ export function LoginPage() {
         className="hidden lg:block lg:w-1/2 bg-cover bg-center"
         style={{
           backgroundImage:
-            "url('https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1400&q=80')",
+            "url('https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1400&q=80')",
         }}
       >
         <div className="h-full w-full bg-black/55 flex items-center justify-center p-12">

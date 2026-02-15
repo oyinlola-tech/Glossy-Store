@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Eye, Heart, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '../services/api';
+import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../contexts/AuthContext';
 
 type SortOption = 'featured' | 'price_asc' | 'price_desc' | 'name_asc';
@@ -230,8 +231,8 @@ function ProductCard({
         <h4 className="font-semibold text-black dark:text-white mb-1 hover:text-red-500">{product.name}</h4>
       </Link>
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-red-500 font-semibold">${price.toFixed(2)}</span>
-        {original > price ? <span className="text-gray-500 line-through text-sm">${original.toFixed(2)}</span> : null}
+        <span className="text-red-500 font-semibold">{formatCurrency(price)}</span>
+        {original > price ? <span className="text-gray-500 line-through text-sm">{formatCurrency(original)}</span> : null}
       </div>
       <div className="flex items-center gap-1">
         {[...Array(5)].map((_, i) => (

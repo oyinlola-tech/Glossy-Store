@@ -1,6 +1,7 @@
 const {
   Category, Product, ProductImage, ProductColor, ProductSize, ProductVariant,
   FlashSale, FlashSaleProduct, Coupon, ContactMessage, User, Order, OrderItem,
+  PaystackEvent,
 } = require('../models');
 const { sendContactReplyEmail } = require('../services/emailService');
 
@@ -421,5 +422,23 @@ exports.updateOrderStatus = async (req, res, next) => {
     res.json(order);
   } catch (err) {
     next(err);
+  }
+};
+
+exports.getPaymentEvents = async (req, res, next) => {
+  try {
+    const { event } = req.query;
+    const where = {};
+    if (event) {
+      where.event = String(event);
+    }
+    const events = await PaystackEvent.findAll({
+      where,
+      order: [['created_at', 'DESC']],
+      limit: 200,
+    });
+    return res.json(events);
+  } catch (err) {
+    return next(err);
   }
 };

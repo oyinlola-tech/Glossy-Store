@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { MessageCircle, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
@@ -453,25 +453,27 @@ export function SupportChatWidget() {
           <div className="h-12 px-4 bg-red-500 text-white flex items-center justify-between">
             <div className="flex items-center gap-2">
               <p className="font-semibold">
-                {user.role === 'admin' || user.role === 'superadmin' ? 'Admin Support Console' : 'Chat with Support'}
+                {!isGuest && (user.role === 'admin' || user.role === 'superadmin') ? 'Admin Support Console' : 'Chat with Support'}
               </p>
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-full ${
-                  socketStatus === 'connected'
-                    ? 'bg-green-600'
-                    : socketStatus === 'reconnecting'
-                      ? 'bg-amber-500'
-                      : socketStatus === 'connecting'
-                        ? 'bg-blue-500'
-                        : 'bg-gray-700'
-                }`}
-                title={socketStatus}
-              >
-                {socketStatus === 'connected' ? 'Online' : socketStatus === 'reconnecting' ? 'Reconnecting...' : socketStatus === 'connecting' ? 'Connecting...' : 'Offline'}
-              </span>
+              {!isGuest ? (
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full ${
+                    socketStatus === 'connected'
+                      ? 'bg-green-600'
+                      : socketStatus === 'reconnecting'
+                        ? 'bg-amber-500'
+                        : socketStatus === 'connecting'
+                          ? 'bg-blue-500'
+                          : 'bg-gray-700'
+                  }`}
+                  title={socketStatus}
+                >
+                  {socketStatus === 'connected' ? 'Online' : socketStatus === 'reconnecting' ? 'Reconnecting...' : socketStatus === 'connecting' ? 'Connecting...' : 'Offline'}
+                </span>
+              ) : null}
             </div>
             <div className="flex items-center gap-2">
-              {activeConversationId ? (
+              {!isGuest && activeConversationId ? (
                 <>
                   {user.role === 'user' ? (
                     <>
@@ -609,7 +611,7 @@ function ChatPanel({
   setGuestEmail?: (value: string) => void;
   attachments?: File[];
   onAttachmentsChange?: (value: File[]) => void;
-  fileInputRef?: React.RefObject<HTMLInputElement>;
+  fileInputRef?: RefObject<HTMLInputElement>;
 }) {
   return (
     <div className="h-full flex flex-col">
@@ -632,7 +634,7 @@ function ChatPanel({
         </div>
       ) : null}
 
-      {!hasConversation && isUser ? (
+      {!hasConversation && (isUser || showGuestFields) ? (
         <div className="px-3 pt-3">
           <input
             value={subject}

@@ -12,6 +12,7 @@ import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { OtpVerificationPage } from './pages/OtpVerificationPage';
+import { PaymentVerifyPage } from './pages/PaymentVerifyPage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -21,6 +22,7 @@ import { AdminCategoriesPage } from './pages/admin/AdminCategoriesPage';
 import { AdminOrdersPage } from './pages/admin/AdminOrdersPage';
 import { AdminProductsPage } from './pages/admin/AdminProductsPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage';
 import { SuperAdminAdminsPage } from './pages/superadmin/SuperAdminAdminsPage';
 import { SuperAdminDashboard } from './pages/superadmin/SuperAdminDashboard';
 import { SuperAdminSettingsPage } from './pages/superadmin/SuperAdminSettingsPage';
@@ -109,6 +111,7 @@ export const router = createBrowserRouter([
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       { path: 'otp', element: <OtpVerificationPage /> },
+      { path: 'payment/verify', element: <PaymentVerifyPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
       { path: 'products', element: <MainLayout><ProductsPage /></MainLayout> },
       { path: 'products/:id', element: <MainLayout><ProductDetailPage /></MainLayout> },
@@ -180,6 +183,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
             <MainLayout><AdminUsersPage /></MainLayout>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'admin/payments',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+            <MainLayout><AdminPaymentsPage /></MainLayout>
           </ProtectedRoute>
         ),
       },

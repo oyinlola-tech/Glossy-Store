@@ -249,6 +249,7 @@ export const mapCartResponse = (raw: any): CartView => {
 // Health
 export const getHealth = () => apiCall('/health');
 export const getInfo = () => apiCall('/info');
+export const getCurrencyProfile = () => apiCall<{ base: string; currency: string; locale: string; rate: number }>('/currency/profile');
 
 // Auth
 export const register = (data: { name: string; email: string; password: string; referralCode?: string }) =>
@@ -398,12 +399,15 @@ export const deleteCartItem = (itemId: number | string) =>
   });
 
 // Orders
-export const checkout = (data: { shippingAddress: string; couponCode?: string }) =>
+export const checkout = (data: { shippingAddress: string; couponCode?: string; currency?: 'NGN' | 'USD' }) =>
   apiCall<CheckoutResponse>('/orders/checkout', {
     method: 'POST',
     requireAuth: true,
     body: JSON.stringify(data),
   });
+
+export const verifyPaystackPayment = (reference: string) =>
+  apiCall<{ status: string; reference: string; data?: any }>(`/payments/verify/${encodeURIComponent(reference)}`);
 
 export const getCheckoutDiscountPreview = () =>
   apiCall<DiscountPreviewResponse>('/orders/discount-preview', {
@@ -472,6 +476,8 @@ export const updateOrderStatus = (id: number | string, status: string, status_no
     body: JSON.stringify({ status, status_note }),
   });
 export const getAdminUsers = () => apiCall('/admin/users', { requireAuth: true });
+export const getPaymentEvents = (event?: string) =>
+  apiCall(`/admin/payments/events${event ? `?event=${encodeURIComponent(event)}` : ''}`, { requireAuth: true });
 export const createCategory = (data: { name: string; description?: string; parent_id?: number }) =>
   apiCall('/admin/categories', {
     method: 'POST',

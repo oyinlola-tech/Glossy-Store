@@ -4,9 +4,21 @@ const {
   renderWelcomeTemplate,
   renderDeviceChangeTemplate,
   renderContactReplyTemplate,
+  renderPaymentReceiptTemplate,
 } = require('./emailTemplates');
 
+const isEmailConfigured = () => {
+  const host = String(process.env.EMAIL_HOST || '').trim();
+  const user = String(process.env.EMAIL_USER || '').trim();
+  const pass = String(process.env.EMAIL_PASS || '').trim();
+  return Boolean(host && user && pass);
+};
+
 const sendEmail = async ({ to, subject, html }) => {
+  if (!isEmailConfigured()) {
+    console.warn('[email] SMTP not configured. Skipping email send.');
+    return { skipped: true };
+  }
   const fromName = process.env.EMAIL_FROM_NAME || process.env.BRAND_NAME || 'Glossy Store';
   const fromEmail = process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER;
   const mailOptions = {
@@ -43,4 +55,10 @@ const sendContactReplyEmail = async (email, name, reply) => {
   return sendEmail({ to: email, subject, html });
 };
 
-module.exports = { sendEmail, sendOTPEmail, sendWelcomeEmail, sendDeviceChangeEmail, sendContactReplyEmail };
+const sendPaymentReceiptEmail = async ({ email, name, amount, currency, status, reference, eventLabel, occurredAt }) => {
+  const subject = `${process.env.BRAND_NAME || 'Glossy Store'} payment update`;
+  const html = renderPaymentReceiptTemplate({ name, email, amount, currency, status, reference, eventLabel, occurredAt });
+  return sendEmail({ to: email, subject, html });
+};
+
+module.exports = { sendEmail, sendOTPEmail, sendWelcomeEmail, sendDeviceChangeEmail, sendContactReplyEmail, sendPaymentReceiptEmail, isEmailConfigured };

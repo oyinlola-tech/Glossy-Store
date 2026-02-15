@@ -46,4 +46,7 @@ router.get('/users', adminController.getUsers);
 router.get('/orders', adminController.getOrders);
 router.patch('/orders/:id/status', adminController.updateOrderStatus);
 
+// Payments
+router.get('/payments/events', adminController.getPaymentEvents);
+
 module.exports = router;

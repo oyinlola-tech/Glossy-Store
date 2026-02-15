@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Package, Users, ShoppingCart, DollarSign, TrendingUp } from 'lucide-react';
 import * as api from '../../services/api';
+import { formatCurrency } from '../../utils/currency';
 
 export function AdminDashboard() {
   const [summary, setSummary] = useState<any>(null);
@@ -102,6 +103,15 @@ export function AdminDashboard() {
             <h3 className="text-xl font-semibold text-black dark:text-white mb-2">Manage Categories</h3>
             <p className="text-gray-600 dark:text-gray-400 text-sm">Create parent and sub categories</p>
           </Link>
+
+          <Link
+            to="/admin/payments"
+            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
+          >
+            <DollarSign className="size-12 text-red-500 mb-4" />
+            <h3 className="text-xl font-semibold text-black dark:text-white mb-2">Payment Events</h3>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">View Paystack activity</p>
+          </Link>
         </div>
 
         {/* Recent Orders Table */}
@@ -124,7 +134,7 @@ export function AdminDashboard() {
                     <tr key={order.id} className="border-b border-gray-100 dark:border-gray-700">
                       <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{order.id}</td>
                       <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{order.customerName}</td>
-                      <td className="py-3 px-4 text-gray-600 dark:text-gray-400">${order.amount}</td>
+                      <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{formatCurrency(Number(order.amount || 0))}</td>
                       <td className="py-3 px-4">
                         <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded text-xs">
                           {order.status}

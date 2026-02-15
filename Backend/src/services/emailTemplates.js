@@ -150,9 +150,56 @@ const renderContactReplyTemplate = ({ name, reply }) => {
   });
 };
 
+const renderPaymentReceiptTemplate = ({ name, email, amount, currency, status, reference, eventLabel, occurredAt }) => {
+  const t = templateVars();
+  const safeName = name || 'Customer';
+  const dateText = occurredAt ? new Date(occurredAt).toLocaleString() : new Date().toLocaleString();
+  const displayAmount = typeof amount === 'number' ? amount.toFixed(2) : amount;
+  return wrapTemplate({
+    ...t,
+    title: `${t.brandName} Payment Receipt`,
+    preheader: `Payment ${status} for ${t.brandName}`,
+    body: `
+      <h2 style="margin:0 0 12px 0;color:${t.textPrimary};">Hello ${safeName},</h2>
+      <p style="margin:0 0 14px 0;color:${t.textSecondary};line-height:1.6;">
+        We received a payment event from Paystack. Here are the details:
+      </p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+        <tr>
+          <td style="padding:8px 0;color:${t.textSecondary};">Event</td>
+          <td style="padding:8px 0;color:${t.textPrimary};font-weight:600;">${eventLabel}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:${t.textSecondary};">Status</td>
+          <td style="padding:8px 0;color:${t.textPrimary};font-weight:600;">${status}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:${t.textSecondary};">Amount</td>
+          <td style="padding:8px 0;color:${t.textPrimary};font-weight:600;">${currency} ${displayAmount}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:${t.textSecondary};">Reference</td>
+          <td style="padding:8px 0;color:${t.textPrimary};font-weight:600;">${reference || '-'}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:${t.textSecondary};">Date</td>
+          <td style="padding:8px 0;color:${t.textPrimary};font-weight:600;">${dateText}</td>
+        </tr>
+      </table>
+      <p style="margin:0 0 8px 0;color:${t.textSecondary};line-height:1.6;">
+        If you have questions, reply to this email or contact ${t.supportEmail}.
+      </p>
+      <p style="margin:0;color:${t.textSecondary};line-height:1.6;">
+        Thanks for shopping with ${t.brandName}.
+      </p>
+    `,
+  });
+};
+
 module.exports = {
   renderOtpTemplate,
   renderWelcomeTemplate,
   renderDeviceChangeTemplate,
   renderContactReplyTemplate,
+  renderPaymentReceiptTemplate,
 };

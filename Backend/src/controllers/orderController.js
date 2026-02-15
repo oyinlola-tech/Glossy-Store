@@ -94,7 +94,7 @@ exports.getDiscountPreview = async (req, res, next) => {
 
 exports.checkout = async (req, res, next) => {
   try {
-    const { shippingAddress, couponCode } = req.body;
+    const { shippingAddress, couponCode, currency } = req.body;
     const userId = req.user.id;
 
     // Get user's cart
@@ -228,11 +228,18 @@ exports.checkout = async (req, res, next) => {
 
     // Initialize payment
     const paymentReference = `PAY-${checkoutResult.order.id}-${Date.now()}`;
+    const normalizedCurrency = String(currency || 'NGN').toUpperCase();
+    if (!['NGN', 'USD'].includes(normalizedCurrency)) {
+      return res.status(400).json({ error: 'Unsupported currency. Use NGN or USD.' });
+    }
+    const callbackUrl = process.env.PAYSTACK_CALLBACK_URL || `${process.env.APP_BASE_URL || ''}/payment/verify`;
     const paymentData = await initializeTransaction(
       req.user.email,
       checkoutResult.total,
       paymentReference,
-      { orderId: checkoutResult.order.id }
+      { orderId: checkoutResult.order.id },
+      normalizedCurrency,
+      callbackUrl
     );
 
     res.json({

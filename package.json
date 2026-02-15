@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "vite",
+    "dev": "node scripts/start-all.cjs",
     "start:frontend": "vite",
     "start:backend": "npm run dev --prefix Backend",
     "start": "node scripts/start-all.cjs"

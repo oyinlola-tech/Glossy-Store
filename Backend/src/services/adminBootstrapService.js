@@ -11,10 +11,11 @@ const seedSuperAdminFromEnv = async () => {
     return;
   }
 
+  const email = String(SUPER_ADMIN_EMAIL).trim().toLowerCase();
   const [user, created] = await User.findOrCreate({
-    where: { email: SUPER_ADMIN_EMAIL },
+    where: { email },
     defaults: {
-      name: SUPER_ADMIN_NAME || SUPER_ADMIN_EMAIL.split('@')[0],
+      name: SUPER_ADMIN_NAME || email.split('@')[0],
       password_hash: SUPER_ADMIN_PASSWORD,
       role: 'admin',
       is_super_admin: true,
@@ -22,9 +23,12 @@ const seedSuperAdminFromEnv = async () => {
     },
   });
 
-  if (!created && (!user.is_super_admin || user.role !== 'admin')) {
+  if (!created) {
+    user.name = SUPER_ADMIN_NAME || user.name;
+    user.password_hash = SUPER_ADMIN_PASSWORD;
     user.role = 'admin';
     user.is_super_admin = true;
+    user.email_verified = true;
     await user.save();
   }
 };

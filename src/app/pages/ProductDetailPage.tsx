@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import * as api from '../services/api';
+import { formatCurrency } from '../utils/currency';
 
 export function ProductDetailPage() {
   const { id } = useParams();
@@ -108,8 +109,8 @@ export function ProductDetailPage() {
             <h1 className="text-3xl font-bold text-black dark:text-white mb-4">{product.name}</h1>
             <p className="text-gray-600 dark:text-gray-400 mb-6">{product.description || 'No product description yet.'}</p>
             <div className="flex items-center gap-3 mb-6">
-              <span className="text-3xl font-bold text-red-500">${currentPrice.toFixed(2)}</span>
-              {originalPrice > currentPrice ? <span className="text-gray-500 line-through">${originalPrice.toFixed(2)}</span> : null}
+              <span className="text-3xl font-bold text-red-500">{formatCurrency(currentPrice)}</span>
+              {originalPrice > currentPrice ? <span className="text-gray-500 line-through">{formatCurrency(originalPrice)}</span> : null}
             </div>
 
             {product.ProductVariants?.length ? (

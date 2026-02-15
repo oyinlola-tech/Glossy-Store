@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import * as api from '../services/api';
+import { formatCurrency } from '../utils/currency';
 
 export function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -61,7 +62,7 @@ export function OrdersPage() {
                 </span>
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                <p>Total: ${Number(order.total || 0).toFixed(2)}</p>
+                <p>Total: {formatCurrency(Number(order.total || 0))}</p>
                 <p>Payment: {order.payment_status}</p>
               </div>
               {['pending', 'paid', 'processing'].includes(order.status) ? (

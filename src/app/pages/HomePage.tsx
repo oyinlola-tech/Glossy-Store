@@ -4,8 +4,8 @@ import { ArrowRight, Eye, Heart, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import * as api from '../services/api';
+import { formatCurrency } from '../utils/currency';
 
-const currency = (amount: number) => `$${amount.toFixed(2)}`;
 const toPrice = (product: api.Product) =>
   Number(product.current_price ?? product.base_price ?? 0);
 
@@ -13,6 +13,7 @@ export function HomePage() {
   const [products, setProducts] = useState<api.Product[]>([]);
   const [categories, setCategories] = useState<api.Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trendingProducts, setTrendingProducts] = useState<api.Product[]>([]);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -31,6 +32,17 @@ export function HomePage() {
     };
     void loadData();
   }, []);
+
+  useEffect(() => {
+    if (!products.length) return;
+    const refreshTrending = () => {
+      const shuffled = [...products].sort(() => Math.random() - 0.5);
+      setTrendingProducts(shuffled.slice(0, 3));
+    };
+    refreshTrending();
+    const interval = window.setInterval(refreshTrending, 20000);
+    return () => window.clearInterval(interval);
+  }, [products]);
 
   const flashSaleProducts = useMemo(() => products.slice(0, 4), [products]);
   const topProducts = useMemo(() => products.slice(0, 8), [products]);
@@ -80,9 +92,30 @@ export function HomePage() {
               </Link>
             </div>
             <div className="flex-1 flex justify-center">
-              <div className="w-full max-w-md aspect-video bg-gradient-to-br from-red-500 via-orange-500 to-yellow-500 rounded-lg flex items-center justify-center text-2xl font-bold">
-                Trending Picks
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const shuffled = [...products].sort(() => Math.random() - 0.5);
+                  setTrendingProducts(shuffled.slice(0, 3));
+                }}
+                className="w-full max-w-md aspect-video rounded-lg border border-white/20 bg-white/5 p-4 text-left"
+              >
+                <p className="text-xs uppercase tracking-[0.3em] text-white/60 mb-3">Trending Picks</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {trendingProducts.map((product) => (
+                    <div key={product.id} className="rounded bg-white/10 p-2">
+                      <img
+                        src={product.ProductImages?.[0]?.image_url || `https://source.unsplash.com/200x200/?fashion,${encodeURIComponent(product.name)}`}
+                        alt={product.name}
+                        className="h-20 w-full object-cover rounded mb-2"
+                      />
+                      <p className="text-xs font-semibold truncate">{product.name}</p>
+                      <p className="text-[11px] text-white/70">{formatCurrency(toPrice(product))}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-[11px] text-white/50">Click to refresh picks</p>
+              </button>
             </div>
           </div>
         </div>
@@ -98,18 +131,9 @@ export function HomePage() {
             <h3 className="text-3xl font-bold text-black dark:text-white">Browse By Category</h3>
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-14">
-          {categories.slice(0, 6).map((category) => (
-            <Link
-              key={category.id}
-              to={`/products?category=${category.id}`}
-              className="aspect-square border-2 border-gray-200 dark:border-gray-700 rounded p-3 hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors group flex flex-col justify-between"
-            >
-              <p className="text-sm font-semibold text-black dark:text-white group-hover:text-white">{category.name}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-red-100">
-                {category.subcategories?.length || 0} subcategories
-              </p>
-            </Link>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-14">
+          {categories.slice(0, 9).map((category) => (
+            <CategoryItem key={category.id} category={category} />
           ))}
         </div>
       </section>
@@ -184,14 +208,55 @@ function ProductCard({ product, onAddToCart }: { product: api.Product; onAddToCa
         <h4 className="font-semibold text-black dark:text-white mb-1 hover:text-red-500">{product.name}</h4>
       </Link>
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-red-500 font-semibold">{currency(price)}</span>
-        {original > price ? <span className="text-gray-500 line-through text-sm">{currency(original)}</span> : null}
+        <span className="text-red-500 font-semibold">{formatCurrency(price)}</span>
+        {original > price ? <span className="text-gray-500 line-through text-sm">{formatCurrency(original)}</span> : null}
       </div>
       <div className="flex items-center gap-1">
         {[...Array(5)].map((_, i) => (
           <Star key={i} className={`size-4 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300 dark:text-gray-600'}`} />
         ))}
       </div>
+    </div>
+  );
+}
+
+function CategoryItem({ category }: { category: api.Category }) {
+  const [open, setOpen] = useState(false);
+  const hasChildren = Boolean(category.subcategories?.length);
+  return (
+    <div className="border-2 border-gray-200 dark:border-gray-700 rounded">
+      <div className="flex items-center justify-between p-4">
+        <Link
+          to={`/products?category=${category.id}`}
+          className="text-sm font-semibold text-black dark:text-white hover:text-red-500"
+        >
+          {category.name}
+        </Link>
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={() => setOpen((prev) => !prev)}
+            className="text-xs text-red-500 hover:underline"
+          >
+            {open ? 'Hide' : 'Show'} subcategories
+          </button>
+        ) : null}
+      </div>
+      {open && hasChildren ? (
+        <div className="border-t border-gray-200 dark:border-gray-700 px-4 pb-3">
+          <div className="pt-3 flex flex-wrap gap-2">
+            {category.subcategories?.map((sub) => (
+              <Link
+                key={sub.id}
+                to={`/products?category=${sub.id}`}
+                className="text-xs px-3 py-1 rounded-full border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-red-500 hover:text-red-500"
+              >
+                {sub.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

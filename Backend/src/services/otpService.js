@@ -2,7 +2,7 @@ const { OTP } = require('../models');
 const { Op } = require('sequelize');
 const crypto = require('crypto');
 const generateOTP = require('../utils/generateOTP');
-const { sendOTPEmail } = require('./emailService');
+const { sendOTPEmail, isEmailConfigured } = require('./emailService');
 
 const getOtpHashSecret = () => process.env.OTP_HASH_SECRET || process.env.JWT_SECRET || 'otp-default-secret';
 
@@ -34,8 +34,11 @@ const createOTP = async (email, purpose, userId = null) => {
     expires_at,
   });
 
-  // Send email
-  await sendOTPEmail(email, otpCode, purpose);
+  // Send email (or log OTP in dev if SMTP not configured)
+  const result = await sendOTPEmail(email, otpCode, purpose);
+  if (result?.skipped && process.env.NODE_ENV !== 'production' && !isEmailConfigured()) {
+    console.warn(`[otp] SMTP not configured. OTP for ${email} (${purpose}): ${otpCode}`);
+  }
 
   return otp;
 };

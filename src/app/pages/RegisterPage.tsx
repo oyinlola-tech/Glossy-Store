@@ -40,7 +40,7 @@ export function RegisterPage() {
         className="hidden lg:block lg:w-1/2 bg-cover bg-center"
         style={{
           backgroundImage:
-            "url('https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=1400&q=80')",
+            "url('https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=1400&q=80')",
         }}
       >
         <div className="h-full w-full bg-black/55 flex items-center justify-center p-12">

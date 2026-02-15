@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import * as api from '../services/api';
+import { formatCurrency } from '../utils/currency';
 
 type CheckoutState = { couponCode?: string };
 type CheckoutLocationState = CheckoutState | null;
@@ -11,6 +12,8 @@ export function CheckoutPage() {
   const location = useLocation();
   const state = ((location.state as CheckoutLocationState) || {}) as CheckoutState;
   const [loading, setLoading] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentCurrency, setPaymentCurrency] = useState<'NGN' | 'USD'>('NGN');
   const [cart, setCart] = useState<api.CartView>({ items: [], subtotal: 0 });
   const [discountPreview, setDiscountPreview] = useState<api.DiscountPreviewResponse | null>(null);
   const [formData, setFormData] = useState({
@@ -56,8 +59,7 @@ export function CheckoutPage() {
   }, [discountPreview, state.couponCode]);
   const total = useMemo(() => Math.max(0, cart.subtotal + shipping - welcomeDiscount), [cart.subtotal, shipping, welcomeDiscount]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitOrder = async () => {
     if (!cart.items.length) {
       toast.error('Your cart is empty');
       navigate('/cart');
@@ -85,18 +87,29 @@ export function CheckoutPage() {
       const checkoutResponse = await api.checkout({
         shippingAddress,
         couponCode: state.couponCode,
+        currency: paymentCurrency,
       });
 
       if (checkoutResponse.welcome_discount_applied) {
         toast.success(checkoutResponse.welcome_discount_message || '10% first-order discount applied');
       }
-      toast.success('Order placed successfully');
+      const authorizationUrl = checkoutResponse?.payment?.data?.authorization_url;
+      if (authorizationUrl) {
+        window.location.href = authorizationUrl;
+        return;
+      }
+      toast.success(`Order placed successfully (${paymentCurrency})`);
       navigate('/orders');
     } catch (error: any) {
       toast.error(error.message || 'Failed to place order');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPaymentOpen(true);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,28 +179,28 @@ export function CheckoutPage() {
                 {cart.items.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                     <span>{item.productName} x {item.quantity}</span>
-                    <span>${item.subtotal.toFixed(2)}</span>
+                    <span>{formatCurrency(item.subtotal)}</span>
                   </div>
                 ))}
               </div>
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                   <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
-                  <span className="text-black dark:text-white">${cart.subtotal.toFixed(2)}</span>
+                  <span className="text-black dark:text-white">{formatCurrency(cart.subtotal)}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                   <span className="text-gray-600 dark:text-gray-400">Shipping:</span>
-                  <span className="text-black dark:text-white">{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
+                  <span className="text-black dark:text-white">{shipping === 0 ? 'Free' : formatCurrency(shipping)}</span>
                 </div>
                 {welcomeDiscount > 0 ? (
                   <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                     <span className="text-gray-600 dark:text-gray-400">Welcome discount:</span>
-                    <span className="text-green-600 dark:text-green-300">-${welcomeDiscount.toFixed(2)}</span>
+                    <span className="text-green-600 dark:text-green-300">-{formatCurrency(welcomeDiscount)}</span>
                   </div>
                 ) : null}
                 <div className="flex justify-between py-2">
                   <span className="text-black dark:text-white font-semibold">Total:</span>
-                  <span className="text-black dark:text-white font-semibold">${total.toFixed(2)}</span>
+                  <span className="text-black dark:text-white font-semibold">{formatCurrency(total)}</span>
                 </div>
               </div>
               <button onClick={handleSubmit} disabled={loading} className="w-full bg-red-500 text-white py-3 rounded hover:bg-red-600 disabled:opacity-50 font-semibold">
@@ -197,6 +210,61 @@ export function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {paymentOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-900 p-6 shadow-2xl">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-black dark:text-white">Pay with Paystack</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Choose your payment currency</p>
+              </div>
+              <button onClick={() => setPaymentOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <label className="flex items-center justify-between border rounded-lg px-4 py-3 cursor-pointer">
+                <div>
+                  <p className="font-semibold text-black dark:text-white">Pay in NGN</p>
+                  <p className="text-xs text-gray-500">Recommended for local cards</p>
+                </div>
+                <input
+                  type="radio"
+                  name="currency"
+                  value="NGN"
+                  checked={paymentCurrency === 'NGN'}
+                  onChange={() => setPaymentCurrency('NGN')}
+                />
+              </label>
+              <label className="flex items-center justify-between border rounded-lg px-4 py-3 cursor-pointer">
+                <div>
+                  <p className="font-semibold text-black dark:text-white">Pay in USD</p>
+                  <p className="text-xs text-gray-500">For international cards</p>
+                </div>
+                <input
+                  type="radio"
+                  name="currency"
+                  value="USD"
+                  checked={paymentCurrency === 'USD'}
+                  onChange={() => setPaymentCurrency('USD')}
+                />
+              </label>
+            </div>
+
+            <button
+              type="button"
+              disabled={loading}
+              onClick={async () => {
+                setPaymentOpen(false);
+                await submitOrder();
+              }}
+              className="w-full bg-red-500 text-white py-3 rounded hover:bg-red-600 disabled:opacity-50 font-semibold"
+            >
+              {loading ? 'Processing...' : 'Continue to Paystack'}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
