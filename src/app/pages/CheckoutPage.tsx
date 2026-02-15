@@ -14,6 +14,8 @@ export function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentCurrency, setPaymentCurrency] = useState<'NGN' | 'USD'>('NGN');
+  const [savedMethods, setSavedMethods] = useState<api.SavedPaymentMethod[]>([]);
+  const [selectedSavedMethodId, setSelectedSavedMethodId] = useState<number | null>(null);
   const [cart, setCart] = useState<api.CartView>({ items: [], subtotal: 0 });
   const [discountPreview, setDiscountPreview] = useState<api.DiscountPreviewResponse | null>(null);
   const [formData, setFormData] = useState({
@@ -29,14 +31,22 @@ export function CheckoutPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [cartRaw, profile, preview] = await Promise.all([
+        const [cartRaw, profile, preview, methods] = await Promise.all([
           api.getCart(),
           api.getUserProfile(),
           api.getCheckoutDiscountPreview(),
+          api.getPaymentMethods().catch(() => ({ paymentMethods: [] as api.SavedPaymentMethod[] })),
         ]);
         const mapped = api.mapCartResponse(cartRaw);
         setCart(mapped);
         setDiscountPreview(preview);
+        setSavedMethods(Array.isArray(methods.paymentMethods) ? methods.paymentMethods : []);
+        const defaultMethod = Array.isArray(methods.paymentMethods)
+          ? methods.paymentMethods.find((method) => method.is_default)
+          : null;
+        if (defaultMethod) {
+          setSelectedSavedMethodId(defaultMethod.id);
+        }
         setFormData((prev) => ({
           ...prev,
           firstName: String(profile?.name || '').split(' ')[0] || '',
@@ -88,6 +98,7 @@ export function CheckoutPage() {
         shippingAddress,
         couponCode: state.couponCode,
         currency: paymentCurrency,
+        paymentMethodId: selectedSavedMethodId || undefined,
       });
 
       if (checkoutResponse.welcome_discount_applied) {
@@ -223,6 +234,42 @@ export function CheckoutPage() {
             </div>
 
             <div className="space-y-3 mb-6">
+              {savedMethods.length ? (
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                  <p className="text-sm font-semibold text-black dark:text-white mb-2">Saved cards</p>
+                  <label className="flex items-center justify-between px-2 py-2 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Use new card</span>
+                    <input
+                      type="radio"
+                      name="saved-method"
+                      checked={selectedSavedMethodId === null}
+                      onChange={() => setSelectedSavedMethodId(null)}
+                    />
+                  </label>
+                  {savedMethods.map((method) => (
+                    <label
+                      key={method.id}
+                      className="flex items-center justify-between px-2 py-2 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      <div>
+                        <p className="text-sm text-black dark:text-white">
+                          {(method.brand || 'CARD').toUpperCase()} ****{method.last4 || '****'}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Exp {String(method.exp_month || '--').padStart(2, '0')}/{method.exp_year || '----'}
+                          {method.is_default ? ' • Default' : ''}
+                        </p>
+                      </div>
+                      <input
+                        type="radio"
+                        name="saved-method"
+                        checked={selectedSavedMethodId === method.id}
+                        onChange={() => setSelectedSavedMethodId(method.id)}
+                      />
+                    </label>
+                  ))}
+                </div>
+              ) : null}
               <label className="flex items-center justify-between border rounded-lg px-4 py-3 cursor-pointer">
                 <div>
                   <p className="font-semibold text-black dark:text-white">Pay in NGN</p>

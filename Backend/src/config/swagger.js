@@ -170,6 +170,32 @@ const swaggerSpec = {
       delete: { tags: ['Users'], summary: 'Remove wishlist', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'productId', required: true, schema: { type: 'integer' } }], responses: authResponses({ message: 'Removed from wishlist' }) },
     },
     '/user/referral': { get: { tags: ['Users'], summary: 'Referral info', security: [{ bearerAuth: [] }], responses: authResponses({ referralCode: 'ABC12345', referrals: [] }) } },
+    '/user/payment-methods': {
+      get: {
+        tags: ['Users'],
+        summary: 'List saved payment methods',
+        security: [{ bearerAuth: [] }],
+        responses: authResponses({ paymentMethods: [{ id: 1, brand: 'VISA', last4: '4242', is_default: true }] }),
+      },
+    },
+    '/user/payment-methods/{id}/default': {
+      patch: {
+        tags: ['Users'],
+        summary: 'Set default payment method',
+        security: [{ bearerAuth: [] }],
+        parameters: [pathIdParam],
+        responses: authResponses({ message: 'Default payment method updated', paymentMethod: { id: 1, is_default: true } }),
+      },
+    },
+    '/user/payment-methods/{id}': {
+      delete: {
+        tags: ['Users'],
+        summary: 'Delete payment method',
+        security: [{ bearerAuth: [] }],
+        parameters: [pathIdParam],
+        responses: authResponses({ message: 'Payment method removed' }),
+      },
+    },
 
     '/products': {
       get: {
@@ -200,7 +226,27 @@ const swaggerSpec = {
       delete: { tags: ['Cart'], summary: 'Delete cart item', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'itemId', required: true, schema: { type: 'integer' } }], responses: authResponses({ message: 'Item removed' }) },
     },
 
-    '/orders/checkout': { post: { tags: ['Orders'], summary: 'Checkout', security: [{ bearerAuth: [] }], requestBody: { required: true, content: jsonContent({ type: 'object' }) }, responses: authResponses({ order: { id: 1 }, payment: { status: true } }) } },
+    '/orders/checkout': {
+      post: {
+        tags: ['Orders'],
+        summary: 'Checkout',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: jsonContent({
+            type: 'object',
+            required: ['shippingAddress'],
+            properties: {
+              shippingAddress: { type: 'string' },
+              couponCode: { type: 'string' },
+              currency: { type: 'string', enum: ['NGN', 'USD'] },
+              paymentMethodId: { type: 'integer' },
+            },
+          }),
+        },
+        responses: authResponses({ order: { id: 1 }, payment: { status: true } }),
+      },
+    },
     '/orders': { get: { tags: ['Orders'], summary: 'List orders', security: [{ bearerAuth: [] }], responses: authResponses([]) } },
     '/orders/{id}': { get: { tags: ['Orders'], summary: 'Order details', security: [{ bearerAuth: [] }], parameters: [pathIdParam], responses: authResponses({ id: 1, status: 'paid' }) } },
     '/orders/{id}/status': { get: { tags: ['Orders'], summary: 'Order status', security: [{ bearerAuth: [] }], parameters: [pathIdParam], responses: authResponses({ id: 1, status: 'out_for_delivery' }) } },

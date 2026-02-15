@@ -25,6 +25,7 @@ const SupportMessage = require('./SupportMessage');
 const SupportMessageAttachment = require('./SupportMessageAttachment');
 const SupportMessageReceipt = require('./SupportMessageReceipt');
 const PaystackEvent = require('./PaystackEvent');
+const PaymentMethod = require('./PaymentMethod');
 
 // User associations
 User.hasMany(OTP, { foreignKey: 'user_id' });
@@ -41,6 +42,7 @@ User.hasMany(Referral, { as: 'referralsMade', foreignKey: 'referrer_user_id' });
 User.belongsTo(User, { as: 'referrer', foreignKey: 'referred_by' });
 User.hasMany(User, { as: 'adminsCreated', foreignKey: 'created_by_admin_id' });
 User.belongsTo(User, { as: 'createdByAdmin', foreignKey: 'created_by_admin_id' });
+User.hasMany(PaymentMethod, { foreignKey: 'user_id' });
 
 // OTP belongs to User
 OTP.belongsTo(User, { foreignKey: 'user_id' });
@@ -166,4 +168,7 @@ module.exports = {
   SupportMessageAttachment,
   SupportMessageReceipt,
   PaystackEvent,
+  PaymentMethod,
 };
+// PaymentMethod
+PaymentMethod.belongsTo(User, { foreignKey: 'user_id' });

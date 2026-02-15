@@ -7,6 +7,7 @@ const SENSITIVE_KEYS = new Set([
   'otp_code',
   'token',
 ]);
+const BLOCKED_OBJECT_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
 const sanitizeString = (value, shouldTrim = true) => {
   const noNullBytes = String(value).replace(/\u0000/g, '');
@@ -17,6 +18,9 @@ const sanitizeValue = (value, key = '') => {
   if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, key));
   if (value && typeof value === 'object') {
     return Object.entries(value).reduce((acc, [key, item]) => {
+      if (BLOCKED_OBJECT_KEYS.has(key)) {
+        return acc;
+      }
       acc[key] = sanitizeValue(item, key);
       return acc;
     }, {});

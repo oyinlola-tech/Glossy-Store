@@ -15,8 +15,8 @@ export function PaymentVerifyPage() {
         return;
       }
       try {
-        const result = await api.verifyPaystackPayment(reference);
-        if (result.status === 'success') {
+        const result = await api.verifyPayment(reference);
+        if (String(result.status).toLowerCase() === 'success') {
           setStatus('success');
           toast.success('Payment verified successfully');
         } else {

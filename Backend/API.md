@@ -36,6 +36,9 @@ This file is generated from `src/config/swagger.js` to keep endpoint docs 1:1 wi
 | POST | `/user/wishlist/{productId}` | `postUserWishlistProductId` | Users | Yes | Add wishlist |
 | DELETE | `/user/wishlist/{productId}` | `deleteUserWishlistProductId` | Users | Yes | Remove wishlist |
 | GET | `/user/referral` | `getUserReferral` | Users | Yes | Referral info |
+| GET | `/user/payment-methods` | `getUserPaymentMethods` | Users | Yes | List saved payment methods |
+| PATCH | `/user/payment-methods/{id}/default` | `patchUserPaymentMethodsIdDefault` | Users | Yes | Set default payment method |
+| DELETE | `/user/payment-methods/{id}` | `deleteUserPaymentMethodsId` | Users | Yes | Delete payment method |
 | GET | `/products` | `getProducts` | Products | No | List products |
 | GET | `/products/{id}` | `getProductsId` | Products | No | Get product |
 | POST | `/products/{id}/rate` | `postProductsIdRate` | Products | Yes | Rate product |

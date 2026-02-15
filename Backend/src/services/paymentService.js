@@ -35,6 +35,40 @@ const initializeTransaction = async (email, amount, reference, metadata = {}, cu
   return data;
 };
 
+const chargeWithSavedCard = async (
+  email,
+  amount,
+  reference,
+  currency = 'NGN',
+  cardToken,
+  metadata = {},
+  callbackUrl = undefined
+) => {
+  const normalizedCurrency = String(currency || 'NGN').toUpperCase();
+  const response = await fetch(`${config.squadApiUrl}${config.squadTokenChargePath}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.squadSecret}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      amount: Math.round(Number(amount) * 100),
+      currency: normalizedCurrency,
+      transaction_ref: reference,
+      callback_url: callbackUrl,
+      card_token: cardToken,
+      metadata,
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data?.message || 'Saved card charge failed');
+  }
+  return data;
+};
+
 const verifyTransaction = async (reference) => {
   const response = await fetch(`${config.squadApiUrl}/transaction/verify/${reference}`, {
     method: 'GET',
@@ -50,4 +84,4 @@ const verifyTransaction = async (reference) => {
   return data;
 };
 
-module.exports = { initializeTransaction, verifyTransaction };
+module.exports = { initializeTransaction, chargeWithSavedCard, verifyTransaction };

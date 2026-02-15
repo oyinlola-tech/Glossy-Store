@@ -8,6 +8,7 @@ const STATUSES = ['pending', 'paid', 'processing', 'shipped', 'out_for_delivery'
 export function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actingOrderId, setActingOrderId] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -25,11 +26,28 @@ export function AdminOrdersPage() {
 
   const changeStatus = async (orderId: number, status: string) => {
     try {
+      setActingOrderId(orderId);
       await api.updateOrderStatus(orderId, status);
       setOrders((prev) => prev.map((order) => order.id === orderId ? { ...order, status } : order));
       toast.success('Order status updated');
     } catch (error: any) {
       toast.error(error.message || 'Failed to update status');
+    } finally {
+      setActingOrderId(null);
+    }
+  };
+
+  const resolveDispute = async (orderId: number, decision: 'approve_chargeback' | 'reject_chargeback') => {
+    const note = window.prompt('Optional admin note')?.trim();
+    try {
+      setActingOrderId(orderId);
+      const updated = await api.resolveOrderDispute(orderId, decision, note || undefined);
+      setOrders((prev) => prev.map((order) => order.id === orderId ? updated : order));
+      toast.success('Dispute resolved');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to resolve dispute');
+    } finally {
+      setActingOrderId(null);
     }
   };
 
@@ -44,14 +62,39 @@ export function AdminOrdersPage() {
             <div>
               <p className="font-semibold text-black dark:text-white">#{order.order_number}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">{formatCurrency(Number(order.total || 0))}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">Payment: {order.payment_status || 'pending'}</p>
+              {order.dispute_status && order.dispute_status !== 'none' ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400 capitalize">Dispute: {String(order.dispute_status).replace(/_/g, ' ')}</p>
+              ) : null}
             </div>
-            <select
-              value={order.status}
-              onChange={(e) => changeStatus(order.id, e.target.value)}
-              className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white"
-            >
-              {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
-            </select>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <select
+                value={order.status}
+                onChange={(e) => changeStatus(order.id, e.target.value)}
+                disabled={actingOrderId === order.id}
+                className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white disabled:opacity-60"
+              >
+                {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+              </select>
+              {order.dispute_status === 'pending' ? (
+                <>
+                  <button
+                    onClick={() => resolveDispute(order.id, 'approve_chargeback')}
+                    disabled={actingOrderId === order.id}
+                    className="px-3 py-2 rounded bg-green-600 text-white disabled:opacity-60"
+                  >
+                    Approve Chargeback
+                  </button>
+                  <button
+                    onClick={() => resolveDispute(order.id, 'reject_chargeback')}
+                    disabled={actingOrderId === order.id}
+                    className="px-3 py-2 rounded bg-gray-900 text-white disabled:opacity-60"
+                  >
+                    Reject Dispute
+                  </button>
+                </>
+              ) : null}
+            </div>
           </div>
         ))}
       </div>

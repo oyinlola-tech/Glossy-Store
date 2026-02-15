@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const paymentController = require('../controllers/paymentController');
+const paymentRateLimiter = require('../middleware/paymentRateLimiter');
 
-router.post('/webhook', paymentController.webhook); // Paystack webhook (public)
-router.get('/verify/:reference', paymentController.verify);
-router.get('/verify', paymentController.verify);
+router.post('/webhook', paymentController.webhook); // Squad webhook (public)
+router.get('/verify/:reference', paymentRateLimiter, paymentController.verify);
+router.get('/verify', paymentRateLimiter, paymentController.verify);
 
 module.exports = router;

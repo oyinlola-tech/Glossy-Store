@@ -1,4 +1,11 @@
-const { Wishlist, Cart, Order, User, Product, ProductImage, ProductVariant, ProductColor, ProductSize } = require('../models');
+const {
+  Wishlist, Cart, Order, User, Product, ProductImage, ProductVariant, ProductColor, ProductSize,
+} = require('../models');
+const {
+  getUserPaymentMethods,
+  setDefaultPaymentMethod,
+  deactivatePaymentMethod,
+} = require('../services/paymentMethodService');
 
 exports.getProfile = async (req, res, next) => {
   try {
@@ -61,7 +68,10 @@ exports.getWishlist = async (req, res, next) => {
 
 exports.addToWishlist = async (req, res, next) => {
   try {
-    const productId = req.params.productId;
+    const productId = Number(req.params.productId);
+    if (!Number.isInteger(productId) || productId <= 0) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
     const [item, created] = await Wishlist.findOrCreate({
       where: { user_id: req.user.id, product_id: productId },
     });
@@ -73,7 +83,10 @@ exports.addToWishlist = async (req, res, next) => {
 
 exports.removeFromWishlist = async (req, res, next) => {
   try {
-    const productId = req.params.productId;
+    const productId = Number(req.params.productId);
+    if (!Number.isInteger(productId) || productId <= 0) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
     await Wishlist.destroy({
       where: { user_id: req.user.id, product_id: productId },
     });
@@ -93,5 +106,42 @@ exports.getReferralInfo = async (req, res, next) => {
     res.json({ referralCode: req.user.referral_code, referrals });
   } catch (err) {
     next(err);
+  }
+};
+
+exports.getPaymentMethods = async (req, res, next) => {
+  try {
+    const methods = await getUserPaymentMethods(req.user.id);
+    res.json({ paymentMethods: methods });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.setDefaultPaymentMethod = async (req, res, next) => {
+  try {
+    const paymentMethodId = Number(req.params.id);
+    if (!Number.isInteger(paymentMethodId) || paymentMethodId <= 0) {
+      return res.status(400).json({ error: 'Invalid payment method id' });
+    }
+    const method = await setDefaultPaymentMethod(req.user.id, paymentMethodId);
+    if (!method) return res.status(404).json({ error: 'Payment method not found' });
+    return res.json({ message: 'Default payment method updated', paymentMethod: method });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+exports.deletePaymentMethod = async (req, res, next) => {
+  try {
+    const paymentMethodId = Number(req.params.id);
+    if (!Number.isInteger(paymentMethodId) || paymentMethodId <= 0) {
+      return res.status(400).json({ error: 'Invalid payment method id' });
+    }
+    const removed = await deactivatePaymentMethod(req.user.id, paymentMethodId);
+    if (!removed) return res.status(404).json({ error: 'Payment method not found' });
+    return res.json({ message: 'Payment method removed' });
+  } catch (err) {
+    return next(err);
   }
 };

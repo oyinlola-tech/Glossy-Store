@@ -4,6 +4,7 @@ const checkoutSchema = Joi.object({
   shippingAddress: Joi.string().trim().min(5).max(500).required(),
   couponCode: Joi.string().trim().max(64).allow('', null).optional(),
   currency: Joi.string().trim().uppercase().valid('NGN', 'USD').optional(),
+  paymentMethodId: Joi.number().integer().positive().optional(),
 });
 
 const orderIdParamSchema = Joi.object({

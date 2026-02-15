@@ -21,8 +21,16 @@ const safeParse = <T>(value: string | null): T | null => {
   }
 };
 
+const safeStorageGetItem = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
 const getStoredToken = (): string | null => {
-  const session = safeParse<{ token?: string }>(localStorage.getItem(STORAGE_KEY));
+  const session = safeParse<{ token?: string }>(safeStorageGetItem(STORAGE_KEY));
   return session?.token || null;
 };
 
@@ -199,6 +207,19 @@ export type CheckoutResponse = {
   };
 };
 
+export type SavedPaymentMethod = {
+  id: number;
+  provider: 'squad';
+  type: 'card';
+  brand?: string | null;
+  last4?: string | null;
+  exp_month?: number | null;
+  exp_year?: number | null;
+  is_default: boolean;
+  is_active: boolean;
+  created_at?: string;
+};
+
 export type CouponValidationResponse = {
   message?: string;
   coupon?: {
@@ -334,6 +355,18 @@ export const removeFromWishlist = (productId: number | string) =>
     requireAuth: true,
   });
 export const getUserReferral = () => apiCall('/user/referral', { requireAuth: true });
+export const getPaymentMethods = () =>
+  apiCall<{ paymentMethods: SavedPaymentMethod[] }>('/user/payment-methods', { requireAuth: true });
+export const setDefaultPaymentMethod = (id: number | string) =>
+  apiCall<{ message: string; paymentMethod: SavedPaymentMethod }>(`/user/payment-methods/${id}/default`, {
+    method: 'PATCH',
+    requireAuth: true,
+  });
+export const deletePaymentMethod = (id: number | string) =>
+  apiCall<{ message: string }>(`/user/payment-methods/${id}`, {
+    method: 'DELETE',
+    requireAuth: true,
+  });
 
 // Products
 export const getProducts = (params?: {
@@ -399,7 +432,7 @@ export const deleteCartItem = (itemId: number | string) =>
   });
 
 // Orders
-export const checkout = (data: { shippingAddress: string; couponCode?: string; currency?: 'NGN' | 'USD' }) =>
+export const checkout = (data: { shippingAddress: string; couponCode?: string; currency?: 'NGN' | 'USD'; paymentMethodId?: number }) =>
   apiCall<CheckoutResponse>('/orders/checkout', {
     method: 'POST',
     requireAuth: true,
@@ -408,6 +441,7 @@ export const checkout = (data: { shippingAddress: string; couponCode?: string; c
 
 export const verifyPaystackPayment = (reference: string) =>
   apiCall<{ status: string; reference: string; data?: any }>(`/payments/verify/${encodeURIComponent(reference)}`);
+export const verifyPayment = verifyPaystackPayment;
 
 export const getCheckoutDiscountPreview = () =>
   apiCall<DiscountPreviewResponse>('/orders/discount-preview', {
@@ -421,6 +455,12 @@ export const cancelOrder = (id: number | string) =>
   apiCall(`/orders/${id}/cancel`, {
     method: 'PATCH',
     requireAuth: true,
+  });
+export const requestOrderChargeback = (id: number | string, reason?: string) =>
+  apiCall<{ message: string; order: any }>(`/orders/${id}/chargeback`, {
+    method: 'POST',
+    requireAuth: true,
+    body: JSON.stringify(reason ? { reason } : {}),
   });
 
 // Coupons
@@ -474,6 +514,12 @@ export const updateOrderStatus = (id: number | string, status: string, status_no
     method: 'PATCH',
     requireAuth: true,
     body: JSON.stringify({ status, status_note }),
+  });
+export const resolveOrderDispute = (id: number | string, decision: 'approve_chargeback' | 'reject_chargeback', note?: string) =>
+  apiCall(`/admin/orders/${id}/dispute`, {
+    method: 'PATCH',
+    requireAuth: true,
+    body: JSON.stringify({ decision, note }),
   });
 export const getAdminUsers = () => apiCall('/admin/users', { requireAuth: true });
 export const getPaymentEvents = (event?: string) =>

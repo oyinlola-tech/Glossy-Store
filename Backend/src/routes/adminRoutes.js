@@ -3,6 +3,7 @@ const router = express.Router();
 const adminController = require('../controllers/adminController');
 const { authMiddleware, adminMiddleware, superAdminMiddleware } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const sensitiveActionRateLimiter = require('../middleware/sensitiveActionRateLimiter');
 
 router.use(authMiddleware, adminMiddleware);
 
@@ -44,8 +45,8 @@ router.get('/users', adminController.getUsers);
 
 // Orders
 router.get('/orders', adminController.getOrders);
-router.patch('/orders/:id/status', adminController.updateOrderStatus);
-router.patch('/orders/:id/dispute', adminController.resolveOrderDispute);
+router.patch('/orders/:id/status', sensitiveActionRateLimiter, adminController.updateOrderStatus);
+router.patch('/orders/:id/dispute', sensitiveActionRateLimiter, adminController.resolveOrderDispute);
 
 // Payments
 router.get('/payments/events', adminController.getPaymentEvents);

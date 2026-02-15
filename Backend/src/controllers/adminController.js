@@ -4,6 +4,14 @@ const {
   PaystackEvent,
 } = require('../models');
 const { sendContactReplyEmail } = require('../services/emailService');
+const {
+  orderIdParamSchema,
+  adminUpdateOrderStatusSchema,
+  adminResolveDisputeSchema,
+} = require('../validations/orderValidation');
+
+const validateBody = (schema, body) => schema.validate(body, { abortEarly: true, stripUnknown: true });
+const validateParams = (schema, params) => schema.validate(params, { abortEarly: true, convert: true, stripUnknown: true });
 
 const syncProductStockFromVariants = async (productId) => {
   const variants = await ProductVariant.findAll({
@@ -402,14 +410,20 @@ exports.getDashboardSummary = async (req, res, next) => {
 
 exports.updateOrderStatus = async (req, res, next) => {
   try {
-    const { status, status_note } = req.body;
-    const allowedStatuses = ['pending', 'paid', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'refunded'];
-    if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({ error: 'Invalid order status' });
-    }
+    const paramValidation = validateParams(orderIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const bodyValidation = validateBody(adminUpdateOrderStatusSchema, req.body);
+    if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
+    const { status, status_note } = bodyValidation.value;
 
-    const order = await Order.findByPk(req.params.id);
+    const order = await Order.findByPk(paramValidation.value.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.status === 'refunded' && status !== 'refunded') {
+      return res.status(409).json({ error: 'Refunded orders cannot transition to another status' });
+    }
+    if (status === 'delivered' && !['out_for_delivery', 'delivered'].includes(order.status)) {
+      return res.status(409).json({ error: 'Order must be out_for_delivery before marking delivered' });
+    }
 
     order.status = status;
     order.status_note = status_note || null;
@@ -427,13 +441,13 @@ exports.updateOrderStatus = async (req, res, next) => {
 
 exports.resolveOrderDispute = async (req, res, next) => {
   try {
-    const { decision, note } = req.body;
-    const allowedDecisions = ['approve_chargeback', 'reject_chargeback'];
-    if (!allowedDecisions.includes(decision)) {
-      return res.status(400).json({ error: 'Invalid decision. Use approve_chargeback or reject_chargeback.' });
-    }
+    const paramValidation = validateParams(orderIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const bodyValidation = validateBody(adminResolveDisputeSchema, req.body);
+    if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
+    const { decision, note } = bodyValidation.value;
 
-    const order = await Order.findByPk(req.params.id);
+    const order = await Order.findByPk(paramValidation.value.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
     if (order.dispute_status !== 'pending') {
       return res.status(400).json({ error: 'No pending dispute found for this order' });

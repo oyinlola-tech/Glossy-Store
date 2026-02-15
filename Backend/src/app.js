@@ -83,10 +83,10 @@ app.get('/api/health', (req, res) => {
 app.get('/api/info', (req, res) => {
   res.json({
     name: 'Glossy Store Backend',
-    version: process.env.APP_VERSION ,
-    environment: process.env.NODE_ENV,
-    owner: process.env.APP_OWNER ,
-    portfolio: process.env.APP_PORTFOLIO ,
+    version: process.env.APP_VERSION || 'unknown',
+    environment: process.env.NODE_ENV || 'development',
+    owner: process.env.APP_OWNER || null,
+    portfolio: process.env.APP_PORTFOLIO || null,
     docs_url: '/api/docs',
   });
 });
@@ -105,11 +105,11 @@ app.use(errorHandler);
 const initializeDatabase = async () => {
   await createDatabaseIfNotExists();
   await sequelize.authenticate();
-  const autoSync = String(process.env.AUTO_SYNC_MODELS || 'true').toLowerCase() === 'true';
+  const autoSync = String(process.env.AUTO_SYNC_MODELS || 'false').toLowerCase() === 'true';
   if (autoSync) {
     await sequelize.sync({ alter: true });
   }
-  const autoMigrate = String(process.env.AUTO_RUN_MIGRATIONS || 'true').toLowerCase() === 'true';
+  const autoMigrate = String(process.env.AUTO_RUN_MIGRATIONS || 'false').toLowerCase() === 'true';
   if (autoMigrate) {
     await runMigrations();
   }

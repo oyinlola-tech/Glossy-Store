@@ -7,4 +7,5 @@ module.exports = {
   squadWebhookSecret: process.env.SQUAD_WEBHOOK_SECRET,
   squadWebhookUrl: process.env.SQUAD_WEBHOOK_URL,
   squadCallbackUrl: process.env.SQUAD_CALLBACK_URL,
+  squadTokenChargePath: process.env.SQUAD_TOKEN_CHARGE_PATH || '/transaction/charge_card',
 };

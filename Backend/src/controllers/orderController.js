@@ -1,7 +1,8 @@
 const { Order, OrderItem, Cart, CartItem, Coupon, ProductVariant, Product, User, sequelize } = require('../models');
-const { initializeTransaction } = require('../services/paymentService');
+const { initializeTransaction, chargeWithSavedCard } = require('../services/paymentService');
 const { Op } = require('sequelize');
 const crypto = require('crypto');
+const { getUserMethodWithToken } = require('../services/paymentMethodService');
 const {
   checkoutSchema,
   orderIdParamSchema,
@@ -26,6 +27,73 @@ const refreshProductStock = async (productId, transaction) => {
   });
   const totalStock = variants.reduce((sum, v) => sum + Number(v.stock || 0), 0);
   await Product.update({ stock: totalStock }, { where: { id: productId }, transaction });
+};
+
+const rollbackFailedCheckout = async (userId, orderId) => {
+  await sequelize.transaction(async (transaction) => {
+    const order = await Order.findOne({
+      where: { id: orderId, user_id: userId },
+      include: [{ model: OrderItem }],
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    if (!order) return;
+
+    const cart = await Cart.findOne({
+      where: { user_id: userId },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    const touchedProductIds = new Set();
+
+    for (const item of order.OrderItems) {
+      const variant = await ProductVariant.findByPk(item.product_variant_id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (variant) {
+        variant.stock = Number(variant.stock || 0) + Number(item.quantity || 0);
+        await variant.save({ transaction });
+        touchedProductIds.add(variant.product_id);
+      }
+
+      if (cart) {
+        const existingCartItem = await CartItem.findOne({
+          where: { cart_id: cart.id, product_variant_id: item.product_variant_id },
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (existingCartItem) {
+          existingCartItem.quantity = Number(existingCartItem.quantity || 0) + Number(item.quantity || 0);
+          await existingCartItem.save({ transaction });
+        } else {
+          await CartItem.create({
+            cart_id: cart.id,
+            product_variant_id: item.product_variant_id,
+            quantity: item.quantity,
+          }, { transaction });
+        }
+      }
+    }
+
+    for (const productId of touchedProductIds) {
+      await refreshProductStock(productId, transaction);
+    }
+
+    if (order.coupon_id) {
+      const coupon = await Coupon.findByPk(order.coupon_id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (coupon && Number(coupon.used_count || 0) > 0) {
+        coupon.used_count = Number(coupon.used_count || 0) - 1;
+        await coupon.save({ transaction });
+      }
+    }
+
+    await OrderItem.destroy({ where: { order_id: order.id }, transaction });
+    await order.destroy({ transaction });
+  });
 };
 
 const computeWelcomeDiscount = async ({ userId, cartItems, transaction }) => {
@@ -105,7 +173,7 @@ exports.checkout = async (req, res, next) => {
   try {
     const { error, value } = validateBody(checkoutSchema, req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
-    const { shippingAddress, couponCode, currency } = value;
+    const { shippingAddress, couponCode, currency, paymentMethodId } = value;
     const userId = req.user.id;
 
     // Get user's cart
@@ -244,14 +312,43 @@ exports.checkout = async (req, res, next) => {
       return res.status(400).json({ error: 'Unsupported currency. Use NGN or USD.' });
     }
     const callbackUrl = process.env.SQUAD_CALLBACK_URL || `${process.env.APP_BASE_URL || ''}/payment/verify`;
-    const paymentData = await initializeTransaction(
-      req.user.email,
-      checkoutResult.total,
-      paymentReference,
-      { orderId: checkoutResult.order.id },
-      normalizedCurrency,
-      callbackUrl
-    );
+    let paymentData;
+    try {
+      if (paymentMethodId) {
+        const savedMethod = await getUserMethodWithToken(req.user.id, paymentMethodId);
+        if (!savedMethod) {
+          await rollbackFailedCheckout(userId, checkoutResult.order.id);
+          return res.status(404).json({ error: 'Saved payment method not found' });
+        }
+        paymentData = await chargeWithSavedCard(
+          req.user.email,
+          checkoutResult.total,
+          paymentReference,
+          normalizedCurrency,
+          savedMethod.token,
+          { orderId: checkoutResult.order.id, paymentMethodId },
+          callbackUrl
+        );
+        checkoutResult.order.payment_method = 'saved_card';
+        await checkoutResult.order.save();
+      } else {
+        paymentData = await initializeTransaction(
+          req.user.email,
+          checkoutResult.total,
+          paymentReference,
+          { orderId: checkoutResult.order.id },
+          normalizedCurrency,
+          callbackUrl
+        );
+      }
+    } catch (paymentErr) {
+      try {
+        await rollbackFailedCheckout(userId, checkoutResult.order.id);
+      } catch (rollbackErr) {
+        console.error('Checkout rollback failed:', rollbackErr?.message || rollbackErr);
+      }
+      return res.status(502).json({ error: 'Unable to initialize payment. Please try again.' });
+    }
 
     res.json({
       order: checkoutResult.order,

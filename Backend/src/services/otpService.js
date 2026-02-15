@@ -4,7 +4,19 @@ const crypto = require('crypto');
 const generateOTP = require('../utils/generateOTP');
 const { sendOTPEmail, isEmailConfigured } = require('./emailService');
 
-const getOtpHashSecret = () => process.env.OTP_HASH_SECRET || process.env.JWT_SECRET || 'otp-default-secret';
+let nonProdFallbackSecret = null;
+const getOtpHashSecret = () => {
+  const configured = process.env.OTP_HASH_SECRET || process.env.JWT_SECRET;
+  if (configured) return configured;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('OTP hashing secret is not configured');
+  }
+  if (!nonProdFallbackSecret) {
+    nonProdFallbackSecret = crypto.randomBytes(32).toString('hex');
+    console.warn('[otp] Using generated in-memory OTP hash secret for non-production mode');
+  }
+  return nonProdFallbackSecret;
+};
 
 const hashOTP = (email, purpose, otpCode) => crypto
   .createHmac('sha256', getOtpHashSecret())
