@@ -516,22 +516,50 @@ export const replyContactMessage = (id: number | string, reply: string) =>
   });
 
 // Support
+const buildSupportFormData = (data: Record<string, unknown>, attachments?: File[]) => {
+  const formData = new FormData();
+  Object.entries(data).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    formData.append(key, String(value));
+  });
+  (attachments || []).forEach((file) => {
+    formData.append('attachments', file);
+  });
+  return formData;
+};
+
 export const getSupportConversations = () => apiCall('/support/conversations', { requireAuth: true });
-export const createSupportConversation = (data: { subject?: string; message?: string }) =>
-  apiCall('/support/conversations', {
+export const createSupportConversation = (data: { subject?: string; message?: string; attachments?: File[] }) => {
+  if (data.attachments && data.attachments.length) {
+    return apiCall('/support/conversations', {
+      method: 'POST',
+      requireAuth: true,
+      body: buildSupportFormData({ subject: data.subject, message: data.message }, data.attachments),
+    });
+  }
+  return apiCall('/support/conversations', {
     method: 'POST',
     requireAuth: true,
-    body: JSON.stringify(data),
+    body: JSON.stringify({ subject: data.subject, message: data.message }),
   });
+};
 export const getSupportUnreadCount = () => apiCall('/support/unread-count', { requireAuth: true });
 export const getSupportMessages = (id: number | string) =>
   apiCall(`/support/conversations/${id}/messages`, { requireAuth: true });
-export const sendSupportMessage = (id: number | string, message: string) =>
-  apiCall(`/support/conversations/${id}/messages`, {
+export const sendSupportMessage = (id: number | string, message: string, attachments?: File[]) => {
+  if (attachments && attachments.length) {
+    return apiCall(`/support/conversations/${id}/messages`, {
+      method: 'POST',
+      requireAuth: true,
+      body: buildSupportFormData({ message }, attachments),
+    });
+  }
+  return apiCall(`/support/conversations/${id}/messages`, {
     method: 'POST',
     requireAuth: true,
     body: JSON.stringify({ message }),
   });
+};
 export const markSupportConversationRead = (id: number | string) =>
   apiCall(`/support/conversations/${id}/read`, {
     method: 'PATCH',
@@ -554,4 +582,23 @@ export const deleteSupportConversation = (id: number | string) =>
   apiCall(`/support/conversations/${id}`, {
     method: 'DELETE',
     requireAuth: true,
+  });
+
+// Guest support
+export const createGuestSupportConversation = (data: { name: string; email: string; subject?: string; message?: string; attachments?: File[] }) =>
+  apiCall('/support/guest/conversations', {
+    method: 'POST',
+    body: buildSupportFormData({ name: data.name, email: data.email, subject: data.subject, message: data.message }, data.attachments),
+  });
+
+export const getGuestSupportMessages = (id: number | string, guestToken: string) =>
+  apiCall(`/support/guest/conversations/${id}/messages`, {
+    headers: { 'X-Guest-Token': guestToken },
+  });
+
+export const sendGuestSupportMessage = (id: number | string, guestToken: string, message: string, attachments?: File[]) =>
+  apiCall(`/support/guest/conversations/${id}/messages`, {
+    method: 'POST',
+    headers: { 'X-Guest-Token': guestToken },
+    body: buildSupportFormData({ message }, attachments),
   });

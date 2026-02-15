@@ -7,6 +7,7 @@ const {
   sequelize,
 } = require('../models');
 const { createSignedAttachmentUrl } = require('./attachmentUrlService');
+const { sendContactReplyEmail } = require('./emailService');
 
 const SUPPORT_MESSAGE_MAX_LENGTH = 2000;
 
@@ -22,7 +23,12 @@ const canAccessConversation = (conversation, user) => {
   return conversation.user_id === user.id;
 };
 
-const getRecipientRole = (senderRole) => (senderRole === 'admin' ? 'user' : 'admin');
+const getRecipientRole = (senderRole, conversation) => {
+  if (senderRole === 'admin') {
+    return conversation?.guest_email ? 'guest' : 'user';
+  }
+  return 'admin';
+};
 
 const supportMessageInclude = [
   { model: User, attributes: ['id', 'name', 'email', 'role'] },
@@ -40,7 +46,7 @@ const formatMessageForUser = (message, user) => {
     file_name: attachment.file_name,
     mime_type: attachment.mime_type,
     file_size: attachment.file_size,
-    signed_download_url: createSignedAttachmentUrl(attachment.id, user.id),
+    signed_download_url: user?.id ? createSignedAttachmentUrl(attachment.id, user.id) : null,
   }));
   return {
     ...json,
@@ -62,6 +68,7 @@ const formatMessageForUser = (message, user) => {
 
 const getRecipientUsers = async (conversation, senderRole, transaction) => {
   if (senderRole === 'admin') {
+    if (!conversation.user_id) return [];
     const user = await User.findByPk(conversation.user_id, { transaction });
     return user ? [user] : [];
   }
@@ -72,12 +79,12 @@ const getRecipientUsers = async (conversation, senderRole, transaction) => {
   });
 };
 
-const createMessage = async ({ conversationId, senderUser, message, attachments = [] }) => {
+const createMessage = async ({ conversationId, senderUser, message, attachments = [], skipAccessCheck = false }) => {
   const conversation = await SupportConversation.findByPk(conversationId);
   if (!conversation) {
     throw new Error('Support conversation not found');
   }
-  if (!canAccessConversation(conversation, senderUser)) {
+  if (!skipAccessCheck && !canAccessConversation(conversation, senderUser)) {
     throw new Error('Access denied');
   }
   const trimmedMessage = message ? String(message).trim() : '';
@@ -89,13 +96,17 @@ const createMessage = async ({ conversationId, senderUser, message, attachments 
   }
 
   const createdMessage = await sequelize.transaction(async (transaction) => {
-    const senderRole = senderUser.role === 'admin' ? 'admin' : 'user';
+    const senderRole = senderUser?.role === 'admin' ? 'admin' : senderUser?.role === 'guest' ? 'guest' : 'user';
+    const senderUserId = senderRole === 'guest' ? null : senderUser?.id ?? null;
+    if (senderRole !== 'guest' && !senderUserId) {
+      throw new Error('Sender user is required');
+    }
     const recipients = await getRecipientUsers(conversation, senderRole, transaction);
     const created = await SupportMessage.create({
       support_conversation_id: conversationId,
-      sender_user_id: senderUser.id,
+      sender_user_id: senderUserId,
       sender_role: senderRole,
-      recipient_role: getRecipientRole(senderRole),
+      recipient_role: getRecipientRole(senderRole, conversation),
       message: trimmedMessage || null,
       is_read: false,
     }, { transaction });
@@ -139,7 +150,15 @@ const createMessage = async ({ conversationId, senderUser, message, attachments 
   const hydrated = await SupportMessage.findByPk(createdMessage.id, {
     include: supportMessageInclude,
   });
-  return formatMessageForUser(hydrated, senderUser);
+  const formatted = formatMessageForUser(hydrated, senderUser);
+
+  if (senderUser?.role === 'admin' && conversation.guest_email) {
+    const replyText = trimmedMessage || 'We have replied to your support message with an attachment.';
+    sendContactReplyEmail(conversation.guest_email, conversation.guest_name || 'there', replyText)
+      .catch(() => {});
+  }
+
+  return formatted;
 };
 
 const markConversationAsDelivered = async ({ conversationId, user }) => {

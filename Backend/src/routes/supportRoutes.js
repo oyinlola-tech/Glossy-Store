@@ -6,6 +6,10 @@ const supportUpload = require('../middleware/supportUpload');
 const { secureSupportAttachments } = require('../middleware/supportAttachmentSecurity');
 const supportRateLimiter = require('../middleware/supportRateLimiter');
 
+router.post('/guest/conversations', supportRateLimiter, supportUpload.array('attachments', 5), secureSupportAttachments, supportController.createGuestConversation);
+router.get('/guest/conversations/:id/messages', supportController.getGuestConversationMessages);
+router.post('/guest/conversations/:id/messages', supportRateLimiter, supportUpload.array('attachments', 5), secureSupportAttachments, supportController.sendGuestConversationMessage);
+
 router.use(authMiddleware);
 
 router.post('/conversations', supportRateLimiter, supportUpload.array('attachments', 5), secureSupportAttachments, supportController.createConversation);

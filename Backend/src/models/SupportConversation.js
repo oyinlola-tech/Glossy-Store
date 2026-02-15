@@ -4,7 +4,7 @@ const sequelize = require('../config/database');
 const SupportConversation = sequelize.define('SupportConversation', {
   user_id: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    allowNull: true,
   },
   status: {
     type: DataTypes.ENUM('open', 'resolved', 'closed'),
@@ -12,6 +12,18 @@ const SupportConversation = sequelize.define('SupportConversation', {
     defaultValue: 'open',
   },
   subject: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  guest_name: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  guest_email: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  guest_token: {
     type: DataTypes.STRING,
     allowNull: true,
   },

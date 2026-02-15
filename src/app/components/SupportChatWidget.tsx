@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MessageCircle, Send, X } from 'lucide-react';
-import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import * as api from '../services/api';
@@ -11,13 +10,15 @@ type Conversation = {
   status: 'open' | 'resolved' | 'closed';
   unread_count?: number;
   User?: { id: number; name: string; email: string };
+  guest_name?: string | null;
+  guest_email?: string | null;
 };
 
 type SupportMessage = {
   id: number;
   support_conversation_id?: number;
-  sender_user_id: number;
-  sender_role: 'user' | 'admin';
+  sender_user_id: number | null;
+  sender_role: 'user' | 'admin' | 'guest';
   message?: string | null;
   created_at: string;
 };
@@ -58,9 +59,9 @@ const loadSocketClientScript = async (): Promise<void> => {
 
 export function SupportChatWidget() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const socketRef = useRef<SocketClient | null>(null);
   const typingStopTimerRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [socketReady, setSocketReady] = useState(false);
@@ -72,6 +73,21 @@ export function SupportChatWidget() {
   const [subject, setSubject] = useState('Support Request');
   const [unreadCount, setUnreadCount] = useState(0);
   const [typingNotice, setTypingNotice] = useState('');
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestConversationId, setGuestConversationId] = useState<number | null>(null);
+  const [guestToken, setGuestToken] = useState<string | null>(null);
+  const [guestMessages, setGuestMessages] = useState<SupportMessage[]>([]);
+  const guestSessionKey = 'supportGuestSession';
+  const isGuest = !user;
+
+  const clearAttachments = () => {
+    setAttachments([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const activeConversation = useMemo(
     () => conversations.find((item) => item.id === activeConversationId) || null,
@@ -95,6 +111,40 @@ export function SupportChatWidget() {
     }
   };
 
+  const loadGuestSession = () => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(guestSessionKey);
+    if (!raw) return;
+    try {
+      const session = JSON.parse(raw) as { id?: number; token?: string; name?: string; email?: string };
+      if (session?.id && session?.token) {
+        setGuestConversationId(session.id);
+        setGuestToken(session.token);
+        if (session.name) setGuestName(session.name);
+        if (session.email) setGuestEmail(session.email);
+      }
+    } catch {
+      // Ignore invalid stored session
+    }
+  };
+
+  const persistGuestSession = (id: number, token: string, name: string, email: string) => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(guestSessionKey, JSON.stringify({ id, token, name, email }));
+  };
+
+  const loadGuestMessages = async (conversationId: number, token: string) => {
+    setLoading(true);
+    try {
+      const payload = await api.getGuestSupportMessages(conversationId, token) as { messages: SupportMessage[] };
+      setGuestMessages(Array.isArray(payload?.messages) ? payload.messages : []);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to load support messages');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadMessages = async (conversationId: number) => {
     if (!user) return;
     setLoading(true);
@@ -115,6 +165,11 @@ export function SupportChatWidget() {
     if (!user) return;
     void loadConversations();
   }, [user]);
+
+  useEffect(() => {
+    if (!isGuest) return;
+    loadGuestSession();
+  }, [isGuest]);
 
   useEffect(() => {
     let mounted = true;
@@ -232,14 +287,14 @@ export function SupportChatWidget() {
     void loadMessages(activeConversationId);
   }, [open, activeConversationId]);
 
-  const openWidget = () => {
-    if (!user) {
-      toast.info('Please login to chat with support');
-      navigate('/login');
-      return;
-    }
-    setOpen(true);
-  };
+  useEffect(() => {
+    if (!open || !isGuest || !guestConversationId || !guestToken) return;
+    void loadGuestMessages(guestConversationId, guestToken);
+    const interval = window.setInterval(() => {
+      void loadGuestMessages(guestConversationId, guestToken);
+    }, 7000);
+    return () => window.clearInterval(interval);
+  }, [open, isGuest, guestConversationId, guestToken]);
 
   const sendTypingSignal = (isTyping: boolean) => {
     if (!activeConversationId || !socketRef.current) return;
@@ -256,18 +311,57 @@ export function SupportChatWidget() {
 
   const sendMessage = async () => {
     const message = draft.trim();
-    if (!message) return;
+    const hasAttachments = attachments.length > 0;
+    if (!message && !hasAttachments) return;
     setLoading(true);
     try {
+      if (isGuest) {
+        const normalizedEmail = guestEmail.trim().toLowerCase();
+        if (!guestName.trim() || !/\S+@\S+\.\S+/.test(normalizedEmail)) {
+          toast.error('Enter your name and a valid email');
+          return;
+        }
+        if (!guestConversationId || !guestToken) {
+          const created = await api.createGuestSupportConversation({
+            name: guestName.trim(),
+            email: normalizedEmail,
+            subject: subject.trim() || 'Support Request',
+            message,
+            attachments,
+          }) as { conversation: { id: number }; guest_token: string; firstMessage?: SupportMessage };
+          const id = created?.conversation?.id;
+          if (id && created?.guest_token) {
+            setGuestConversationId(id);
+            setGuestToken(created.guest_token);
+            persistGuestSession(id, created.guest_token, guestName.trim(), normalizedEmail);
+            setDraft('');
+            clearAttachments();
+            if (created.firstMessage) {
+              setGuestMessages([created.firstMessage]);
+            } else {
+              await loadGuestMessages(id, created.guest_token);
+            }
+          }
+        } else {
+          await api.sendGuestSupportMessage(guestConversationId, guestToken, message, attachments);
+          setDraft('');
+          clearAttachments();
+          await loadGuestMessages(guestConversationId, guestToken);
+        }
+        return;
+      }
+
       if (!activeConversationId) {
         const created = await api.createSupportConversation({
           subject: subject.trim() || 'Support Request',
           message,
+          attachments,
         }) as { conversation: { id: number }; firstMessage?: SupportMessage };
         const id = created?.conversation?.id;
         if (id) {
           setActiveConversationId(id);
           setDraft('');
+          clearAttachments();
           if (created.firstMessage) {
             setMessages([created.firstMessage]);
           } else {
@@ -276,13 +370,14 @@ export function SupportChatWidget() {
           await loadConversations();
           socketRef.current?.emit('support:join', { conversationId: id });
         }
-      } else if (socketRef.current && socketReady) {
+      } else if (!hasAttachments && socketRef.current && socketReady) {
         socketRef.current.emit('support:message', { conversationId: activeConversationId, message });
         setDraft('');
         sendTypingSignal(false);
       } else {
-        await api.sendSupportMessage(activeConversationId, message);
+        await api.sendSupportMessage(activeConversationId, message, attachments);
         setDraft('');
+        clearAttachments();
         await loadMessages(activeConversationId);
       }
     } catch (error: any) {
@@ -337,19 +432,6 @@ export function SupportChatWidget() {
     }
   };
 
-  if (!user) {
-    return (
-      <button
-        type="button"
-        onClick={openWidget}
-        className="fixed bottom-5 right-5 z-50 size-14 rounded-full bg-red-500 text-white shadow-lg hover:bg-red-600 flex items-center justify-center"
-        aria-label="Open support chat"
-      >
-        <MessageCircle className="size-6" />
-      </button>
-    );
-  }
-
   return (
     <>
       <button
@@ -359,7 +441,7 @@ export function SupportChatWidget() {
         aria-label="Toggle support chat"
       >
         <MessageCircle className="size-6" />
-        {unreadCount > 0 ? (
+        {!isGuest && unreadCount > 0 ? (
           <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-black text-white text-xs flex items-center justify-center">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
@@ -427,7 +509,7 @@ export function SupportChatWidget() {
           </div>
 
           <div className="h-[calc(100%-3rem)] grid grid-cols-1">
-            {user.role !== 'user' ? (
+            {!isGuest && user.role !== 'user' ? (
               <div className="grid grid-cols-[140px_1fr] h-full">
                 <div className="border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
                   {conversations.map((item) => (
@@ -439,7 +521,7 @@ export function SupportChatWidget() {
                       }`}
                     >
                       <p className="text-xs font-semibold text-black dark:text-white truncate">
-                        {item.User?.name || item.subject || `Conversation #${item.id}`}
+                        {item.User?.name || item.guest_email || item.subject || `Conversation #${item.id}`}
                       </p>
                       <p className="text-[11px] text-gray-500 dark:text-gray-400 capitalize">{item.status}</p>
                     </button>
@@ -456,20 +538,31 @@ export function SupportChatWidget() {
                   hasConversation={Boolean(activeConversationId)}
                   isUser={false}
                   typingNotice={typingNotice}
+                  attachments={attachments}
+                  onAttachmentsChange={setAttachments}
+                  fileInputRef={fileInputRef}
                 />
               </div>
             ) : (
               <ChatPanel
                 loading={loading}
-                messages={messages}
+                messages={isGuest ? guestMessages : messages}
                 draft={draft}
                 setDraft={onDraftChange}
                 onSend={sendMessage}
                 subject={subject}
                 setSubject={setSubject}
-                hasConversation={Boolean(activeConversationId)}
-                isUser
+                hasConversation={isGuest ? Boolean(guestConversationId) : Boolean(activeConversationId)}
+                isUser={!isGuest}
                 typingNotice={typingNotice}
+                guestName={guestName}
+                guestEmail={guestEmail}
+                setGuestName={setGuestName}
+                setGuestEmail={setGuestEmail}
+                showGuestFields={isGuest}
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+                fileInputRef={fileInputRef}
               />
             )}
           </div>
@@ -490,6 +583,14 @@ function ChatPanel({
   hasConversation,
   isUser,
   typingNotice,
+  showGuestFields,
+  guestName,
+  guestEmail,
+  setGuestName,
+  setGuestEmail,
+  attachments,
+  onAttachmentsChange,
+  fileInputRef,
 }: {
   loading: boolean;
   messages: SupportMessage[];
@@ -501,9 +602,36 @@ function ChatPanel({
   hasConversation: boolean;
   isUser: boolean;
   typingNotice: string;
+  showGuestFields?: boolean;
+  guestName?: string;
+  guestEmail?: string;
+  setGuestName?: (value: string) => void;
+  setGuestEmail?: (value: string) => void;
+  attachments?: File[];
+  onAttachmentsChange?: (value: File[]) => void;
+  fileInputRef?: React.RefObject<HTMLInputElement>;
 }) {
   return (
     <div className="h-full flex flex-col">
+      {!hasConversation && showGuestFields ? (
+        <div className="px-3 pt-3 space-y-2">
+          <input
+            value={guestName || ''}
+            onChange={(e) => setGuestName?.(e.target.value)}
+            maxLength={80}
+            className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-black dark:text-white text-sm"
+            placeholder="Your name"
+          />
+          <input
+            value={guestEmail || ''}
+            onChange={(e) => setGuestEmail?.(e.target.value)}
+            maxLength={120}
+            className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-black dark:text-white text-sm"
+            placeholder="Your email"
+          />
+        </div>
+      ) : null}
+
       {!hasConversation && isUser ? (
         <div className="px-3 pt-3">
           <input
@@ -546,6 +674,16 @@ function ChatPanel({
       <div className="p-3 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
           <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []).slice(0, 5);
+              onAttachmentsChange?.(files);
+            }}
+          />
+          <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -559,8 +697,15 @@ function ChatPanel({
             className="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-black dark:text-white text-sm"
           />
           <button
+            type="button"
+            onClick={() => fileInputRef?.current?.click()}
+            className="px-2 py-2 rounded border border-gray-300 dark:border-gray-600 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            Attach{attachments && attachments.length ? ` (${attachments.length})` : ''}
+          </button>
+          <button
             onClick={() => void onSend()}
-            disabled={loading || !draft.trim()}
+            disabled={loading || (!draft.trim() && !(attachments && attachments.length))}
             className="size-9 rounded bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 flex items-center justify-center"
             aria-label="Send support message"
           >

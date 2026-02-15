@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const {
   SupportConversation,
   SupportMessageAttachment,
@@ -18,6 +19,10 @@ const {
   markConversationAsRead,
   getUnreadCounts,
 } = require('../services/supportChatService');
+
+const getGuestToken = (req) => req.header('x-guest-token') || req.query.guest_token;
+
+const isValidEmail = (value) => /\S+@\S+\.\S+/.test(String(value || '').trim());
 
 const toAttachmentPayload = (files = []) => files.map((file) => ({
   storage_path: file.path,
@@ -73,6 +78,52 @@ exports.createConversation = async (req, res, next) => {
   }
 };
 
+exports.createGuestConversation = async (req, res, next) => {
+  try {
+    const { name, email, subject, message } = req.body;
+    const normalizedName = String(name || '').trim();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedSubject = subject ? String(subject).trim() : '';
+
+    if (!normalizedName) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+    if (!isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ error: 'Valid email is required' });
+    }
+    if (normalizedSubject.length > 120) {
+      return res.status(400).json({ error: 'Subject cannot exceed 120 characters' });
+    }
+
+    const guestToken = crypto.randomBytes(24).toString('hex');
+    const conversation = await SupportConversation.create({
+      user_id: null,
+      guest_name: normalizedName,
+      guest_email: normalizedEmail,
+      guest_token: guestToken,
+      subject: normalizedSubject || null,
+      status: 'open',
+      last_message_at: new Date(),
+    });
+
+    let firstMessage = null;
+    const attachments = toAttachmentPayload(req.files);
+    if ((message && String(message).trim()) || attachments.length) {
+      firstMessage = await createMessage({
+        conversationId: conversation.id,
+        senderUser: { id: null, role: 'guest', name: normalizedName, email: normalizedEmail },
+        message,
+        attachments,
+        skipAccessCheck: true,
+      });
+    }
+
+    return res.status(201).json({ conversation, guest_token: guestToken, firstMessage });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 exports.getMyConversations = async (req, res, next) => {
   try {
     const where = req.user.role === 'admin' ? {} : { user_id: req.user.id };
@@ -105,6 +156,41 @@ exports.getConversationMessages = async (req, res, next) => {
     if (err.message === 'Access denied') {
       return res.status(403).json({ error: err.message });
     }
+    return next(err);
+  }
+};
+
+exports.getGuestConversationMessages = async (req, res, next) => {
+  try {
+    const token = getGuestToken(req);
+    if (!token) {
+      return res.status(401).json({ error: 'Guest token required' });
+    }
+    const conversation = await SupportConversation.findByPk(req.params.id);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Support conversation not found' });
+    }
+    if (!conversation.guest_token || conversation.guest_token !== token) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const messages = await SupportMessage.findAll({
+      where: { support_conversation_id: conversation.id },
+      include: [SupportMessageAttachment],
+      order: [['created_at', 'ASC']],
+    });
+
+    return res.json({
+      conversation: {
+        id: conversation.id,
+        subject: conversation.subject,
+        status: conversation.status,
+        guest_name: conversation.guest_name,
+        guest_email: conversation.guest_email,
+      },
+      messages: messages.map((message) => toSocketSafeMessage(message.toJSON ? message.toJSON() : message)),
+    });
+  } catch (err) {
     return next(err);
   }
 };
@@ -315,6 +401,45 @@ exports.clearConversationMessages = async (req, res, next) => {
   }
 };
 
+exports.sendGuestConversationMessage = async (req, res, next) => {
+  try {
+    const token = getGuestToken(req);
+    if (!token) {
+      return res.status(401).json({ error: 'Guest token required' });
+    }
+    const conversation = await SupportConversation.findByPk(req.params.id);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Support conversation not found' });
+    }
+    if (!conversation.guest_token || conversation.guest_token !== token) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const createdMessage = await createMessage({
+      conversationId: conversation.id,
+      senderUser: { id: null, role: 'guest', name: conversation.guest_name, email: conversation.guest_email },
+      message: req.body.message,
+      attachments: toAttachmentPayload(req.files),
+      skipAccessCheck: true,
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`support:${conversation.id}`).emit('support:new_message', toSocketSafeMessage(createdMessage));
+      io.to(`support:${conversation.id}`).emit('support:refresh_unread', { conversationId: Number(conversation.id) });
+    }
+
+    return res.status(201).json(createdMessage);
+  } catch (err) {
+    if (err.message === 'Support conversation not found') {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err.message === 'Message cannot be empty' || err.message === 'Message or attachment is required') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+};
 exports.deleteConversation = async (req, res, next) => {
   try {
     const conversation = await SupportConversation.findByPk(req.params.id);
