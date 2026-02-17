@@ -50,7 +50,14 @@ const productCreateSchema = Joi.object({
     stock: Joi.number().integer().min(0).optional(),
     image_id: Joi.number().integer().positive().allow(null).optional(),
   })).optional(),
-});
+}).custom((value, helpers) => {
+  if (value.compare_at_price !== null && value.compare_at_price !== undefined) {
+    if (value.base_price && value.compare_at_price < value.base_price) {
+      return helpers.error('any.invalid');
+    }
+  }
+  return value;
+}, 'compare_at_price validation');
 
 const productUpdateSchema = Joi.object({
   category_id: Joi.number().integer().positive().optional(),
@@ -73,7 +80,14 @@ const productUpdateSchema = Joi.object({
     stock: Joi.number().integer().min(0).optional(),
     image_id: Joi.number().integer().positive().allow(null).optional(),
   })).optional(),
-}).min(1);
+}).custom((value, helpers) => {
+  if (value.compare_at_price !== null && value.compare_at_price !== undefined && value.base_price !== undefined) {
+    if (value.compare_at_price < value.base_price) {
+      return helpers.error('any.invalid');
+    }
+  }
+  return value;
+}, 'compare_at_price validation').min(1);
 
 module.exports = {
   productCreateSchema,

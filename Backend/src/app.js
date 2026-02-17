@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const fs = require('fs');
 const rateLimit = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
 const requestLogger = require('./middleware/requestLogger');
@@ -16,6 +17,10 @@ const { runMigrations } = require('./services/migrationService');
 require('./models');
 
 const app = express();
+const uploadDir = path.resolve(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
   .split(',')
   .map((v) => v.trim())
@@ -89,7 +94,7 @@ app.use(express.urlencoded({ extended: true, limit: process.env.JSON_BODY_LIMIT 
 app.use(sanitizeInput);
 app.use(rateLimit);
 app.use(passport.initialize());
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/uploads', express.static(uploadDir, { fallthrough: false }));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'glossy-store-backend' });
@@ -109,6 +114,13 @@ app.get('/api/info', (req, res) => {
 // Routes
 app.use('/api', routes);
 mountSwagger(app);
+
+app.use((err, req, res, next) => {
+  if (err?.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Invalid JSON payload' });
+  }
+  return next(err);
+});
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });

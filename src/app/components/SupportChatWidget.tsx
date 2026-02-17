@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { MessageCircle, Send, X } from 'lucide-react';
+import { ChevronLeft, MessageCircle, Plus, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import * as api from '../services/api';
@@ -19,6 +19,8 @@ type SupportMessage = {
   support_conversation_id?: number;
   sender_user_id: number | null;
   sender_role: 'user' | 'admin' | 'guest';
+  sender_name?: string | null;
+  sender?: { id: number | null; name: string; role: 'user' | 'admin' | 'guest'; email?: string | null } | null;
   message?: string | null;
   created_at: string;
 };
@@ -29,6 +31,22 @@ type SocketClient = {
   on: (event: string, handler: (...args: any[]) => void) => void;
   off: (event: string, handler?: (...args: any[]) => void) => void;
   disconnect: () => void;
+};
+
+const parseDateSafe = (value: unknown): Date | null => {
+  if (!value) return null;
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatDateTimeSafe = (value: unknown): string => {
+  const date = parseDateSafe(value);
+  return date ? date.toLocaleString() : '';
+};
+
+const formatTimeSafe = (value: unknown): string => {
+  const date = parseDateSafe(value);
+  return date ? date.toLocaleTimeString() : '';
 };
 
 declare global {
@@ -74,13 +92,18 @@ export function SupportChatWidget() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [typingNotice, setTypingNotice] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [conversationSearch, setConversationSearch] = useState('');
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [guestConversationId, setGuestConversationId] = useState<number | null>(null);
   const [guestToken, setGuestToken] = useState<string | null>(null);
   const [guestMessages, setGuestMessages] = useState<SupportMessage[]>([]);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   const guestSessionKey = 'supportGuestSession';
   const isGuest = !user;
+  const isAdminConsole = !isGuest && (user.role === 'admin' || user.role === 'superadmin');
+  const canStartNewChat = isGuest || (!!user && user.role === 'user');
 
   const clearAttachments = () => {
     setAttachments([]);
@@ -93,6 +116,17 @@ export function SupportChatWidget() {
     () => conversations.find((item) => item.id === activeConversationId) || null,
     [conversations, activeConversationId]
   );
+
+  const filteredConversations = useMemo(() => {
+    const q = conversationSearch.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter((item) => {
+      const name = item.User?.name || item.guest_name || '';
+      const email = item.User?.email || item.guest_email || '';
+      const subjectText = item.subject || '';
+      return [name, email, subjectText].some((value) => String(value).toLowerCase().includes(q));
+    });
+  }, [conversations, conversationSearch]);
 
   const loadConversations = async () => {
     if (!user) return;
@@ -165,6 +199,18 @@ export function SupportChatWidget() {
     if (!user) return;
     void loadConversations();
   }, [user]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)');
+    const apply = () => setIsMobile(media.matches);
+    apply();
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', apply);
+      return () => media.removeEventListener('change', apply);
+    }
+    media.addListener(apply);
+    return () => media.removeListener(apply);
+  }, []);
 
   useEffect(() => {
     if (!isGuest) return;
@@ -295,6 +341,12 @@ export function SupportChatWidget() {
     }, 7000);
     return () => window.clearInterval(interval);
   }, [open, isGuest, guestConversationId, guestToken]);
+
+  useEffect(() => {
+    if (open && isMobile && !isGuest) {
+      setMobileView('list');
+    }
+  }, [open, isMobile, isGuest]);
 
   const sendTypingSignal = (isTyping: boolean) => {
     if (!activeConversationId || !socketRef.current) return;
@@ -432,6 +484,85 @@ export function SupportChatWidget() {
     }
   };
 
+  const openConversation = (conversationId: number) => {
+    setActiveConversationId(conversationId);
+    if (isMobile) setMobileView('chat');
+  };
+
+  const startNewChat = async () => {
+    if (!canStartNewChat) {
+      toast.error('Admins can only reply to existing user tickets');
+      return;
+    }
+    setDraft('');
+    clearAttachments();
+    setSubject('Support Request');
+
+    if (isGuest) {
+      const normalizedEmail = guestEmail.trim().toLowerCase();
+      const canCreateGuestTicket = guestName.trim() && /\S+@\S+\.\S+/.test(normalizedEmail);
+      if (!canCreateGuestTicket) {
+        setGuestConversationId(null);
+        setGuestToken(null);
+        setGuestMessages([]);
+        if (typeof window !== 'undefined') window.localStorage.removeItem(guestSessionKey);
+        if (isMobile) setMobileView('chat');
+        return;
+      }
+      setLoading(true);
+      try {
+        const created = await api.createGuestSupportConversation({
+          name: guestName.trim(),
+          email: normalizedEmail,
+          subject: 'Support Request',
+        }) as { conversation?: { id: number }; guest_token?: string; firstMessage?: SupportMessage };
+        const id = created?.conversation?.id;
+        if (id && created?.guest_token) {
+          setGuestConversationId(id);
+          setGuestToken(created.guest_token);
+          setGuestMessages(created.firstMessage ? [created.firstMessage] : []);
+          persistGuestSession(id, created.guest_token, guestName.trim(), normalizedEmail);
+        } else {
+          setGuestConversationId(null);
+          setGuestToken(null);
+          setGuestMessages([]);
+        }
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to create a new chat');
+      } finally {
+        setLoading(false);
+      }
+      if (isMobile) setMobileView('chat');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const created = await api.createSupportConversation({
+        subject: 'Support Request',
+      }) as { conversation?: { id: number }; firstMessage?: SupportMessage };
+      const id = created?.conversation?.id;
+      if (id) {
+        setActiveConversationId(id);
+        setMessages(created.firstMessage ? [created.firstMessage] : []);
+        await loadConversations();
+        socketRef.current?.emit('support:join', { conversationId: id });
+      } else {
+        setActiveConversationId(null);
+        setMessages([]);
+      }
+      if (isMobile) setMobileView('chat');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create a new chat');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isAgent = !isGuest && user.role !== 'user';
+  const showAuthListOnMobile = !isGuest && isMobile && mobileView === 'list';
+  const showAuthChatOnMobile = !isGuest && isMobile && mobileView === 'chat';
+
   return (
     <>
       <button
@@ -449,9 +580,19 @@ export function SupportChatWidget() {
       </button>
 
       {open ? (
-        <div className="fixed bottom-24 right-5 z-50 w-[calc(100vw-2.5rem)] max-w-[380px] h-[540px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden">
-          <div className="h-12 px-4 bg-red-500 text-white flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        <div className={isMobile
+          ? 'fixed inset-0 z-50 bg-[#efeae2] dark:bg-gray-900 overflow-hidden'
+          : isAdminConsole
+            ? 'fixed inset-3 md:inset-8 z-50 bg-[#efeae2] dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden'
+            : 'fixed bottom-24 right-5 z-50 w-[calc(100vw-2.5rem)] max-w-[380px] h-[540px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden'}
+        >
+          <div className={`h-12 px-4 ${isAdminConsole || isMobile ? 'bg-[#b42318]' : 'bg-red-500'} text-white flex items-center justify-between`}>
+            <div className="flex items-center gap-2 min-w-0">
+              {showAuthChatOnMobile ? (
+                <button onClick={() => setMobileView('list')} aria-label="Back to chats">
+                  <ChevronLeft className="size-4" />
+                </button>
+              ) : null}
               <p className="font-semibold">
                 {!isGuest && (user.role === 'admin' || user.role === 'superadmin') ? 'Admin Support Console' : 'Chat with Support'}
               </p>
@@ -473,6 +614,15 @@ export function SupportChatWidget() {
               ) : null}
             </div>
             <div className="flex items-center gap-2">
+              {canStartNewChat ? (
+                <button
+                  type="button"
+                  onClick={() => void startNewChat()}
+                  className="text-[10px] px-2 py-1 rounded bg-white/20 hover:bg-white/30 flex items-center gap-1"
+                >
+                  <Plus className="size-3" /> New Chat
+                </button>
+              ) : null}
               {!isGuest && activeConversationId ? (
                 <>
                   {user.role === 'user' ? (
@@ -511,23 +661,50 @@ export function SupportChatWidget() {
           </div>
 
           <div className="h-[calc(100%-3rem)] grid grid-cols-1">
-            {!isGuest && user.role !== 'user' ? (
-              <div className="grid grid-cols-[140px_1fr] h-full">
-                <div className="border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
-                  {conversations.map((item) => (
+            {!isGuest && !isMobile ? (
+              <div className={`grid ${isAdminConsole ? 'grid-cols-[320px_1fr]' : 'grid-cols-[260px_1fr]'} h-full`}>
+                <div className={`border-r border-gray-200 dark:border-gray-700 overflow-y-auto ${isAdminConsole ? 'bg-[#f0f2f5] dark:bg-gray-950' : 'bg-gray-50 dark:bg-gray-950'}`}>
+                  <div className="p-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur supports-[backdrop-filter]:bg-gray-50/85">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">Conversations</p>
+                    <input
+                      value={conversationSearch}
+                      onChange={(e) => setConversationSearch(e.target.value)}
+                      placeholder="Search by name or email"
+                      className="mt-2 w-full px-2.5 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-black dark:text-white text-xs"
+                    />
+                  </div>
+                  {filteredConversations.map((item) => (
                     <button
                       key={item.id}
-                      onClick={() => setActiveConversationId(item.id)}
-                      className={`w-full text-left px-3 py-2 border-b border-gray-100 dark:border-gray-800 ${
-                        activeConversationId === item.id ? 'bg-gray-100 dark:bg-gray-800' : ''
+                      onClick={() => openConversation(item.id)}
+                      className={`w-full text-left px-3 py-3 border-b border-gray-100 dark:border-gray-800 ${
+                        activeConversationId === item.id
+                          ? `${isAdminConsole ? 'bg-[#fbe9e7] dark:bg-gray-900' : 'bg-white dark:bg-gray-900'}`
+                          : `${isAdminConsole ? 'hover:bg-[#e9edef] dark:hover:bg-gray-900/80' : 'hover:bg-white dark:hover:bg-gray-900/80'}`
                       }`}
                     >
-                      <p className="text-xs font-semibold text-black dark:text-white truncate">
-                        {item.User?.name || item.guest_email || item.subject || `Conversation #${item.id}`}
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-black dark:text-white truncate">
+                          {item.User?.name || item.guest_name || item.guest_email || `Conversation #${item.id}`}
+                        </p>
+                        {Number(item.unread_count || 0) > 0 ? (
+                          <span className="min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
+                            {item.unread_count}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                        {item.User?.email || item.guest_email || item.subject || 'Support conversation'}
                       </p>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 capitalize">{item.status}</p>
+                      <div className="mt-1.5 flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400">
+                        <span className="capitalize">{item.status}</span>
+                        <span>{formatDateTimeSafe(item.last_message_at)}</span>
+                      </div>
                     </button>
                   ))}
+                  {!filteredConversations.length ? (
+                    <p className="p-3 text-xs text-gray-500 dark:text-gray-400">No conversations found</p>
+                  ) : null}
                 </div>
                 <ChatPanel
                   loading={loading}
@@ -539,12 +716,69 @@ export function SupportChatWidget() {
                   setSubject={setSubject}
                   hasConversation={Boolean(activeConversationId)}
                   isUser={false}
+                  isAdminView={isAgent}
+                  isAdminConsole={isAdminConsole}
+                  isMobile={isMobile}
                   typingNotice={typingNotice}
                   attachments={attachments}
                   onAttachmentsChange={setAttachments}
                   fileInputRef={fileInputRef}
                 />
               </div>
+            ) : showAuthListOnMobile ? (
+              <div className="h-full overflow-y-auto bg-[#f0f2f5] dark:bg-gray-950">
+                <div className="p-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-[#f0f2f5]/95 dark:bg-gray-950/95 backdrop-blur">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">Chats</p>
+                  <input
+                    value={conversationSearch}
+                    onChange={(e) => setConversationSearch(e.target.value)}
+                    placeholder="Search by name or email"
+                    className="mt-2 w-full px-2.5 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-black dark:text-white text-xs"
+                  />
+                </div>
+                {filteredConversations.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => openConversation(item.id)}
+                    className={`w-full text-left px-3 py-3 border-b border-gray-100 dark:border-gray-800 ${
+                      activeConversationId === item.id ? 'bg-[#fbe9e7] dark:bg-gray-900' : 'hover:bg-[#e9edef] dark:hover:bg-gray-900/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-black dark:text-white truncate">
+                        {item.User?.name || item.guest_name || item.guest_email || `Conversation #${item.id}`}
+                      </p>
+                      {Number(item.unread_count || 0) > 0 ? (
+                        <span className="min-w-5 h-5 px-1 rounded-full bg-[#b42318] text-white text-[10px] flex items-center justify-center">
+                          {item.unread_count}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                      {item.User?.email || item.guest_email || item.subject || 'Support conversation'}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            ) : showAuthChatOnMobile ? (
+              <ChatPanel
+                loading={loading}
+                messages={messages}
+                draft={draft}
+                setDraft={onDraftChange}
+                onSend={sendMessage}
+                subject={subject}
+                setSubject={setSubject}
+                hasConversation={Boolean(activeConversationId)}
+                isUser={user.role === 'user'}
+                isAdminView={isAgent}
+                isAdminConsole={isAdminConsole}
+                isMobile={isMobile}
+                typingNotice={typingNotice}
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+                fileInputRef={fileInputRef}
+              />
             ) : (
               <ChatPanel
                 loading={loading}
@@ -556,6 +790,9 @@ export function SupportChatWidget() {
                 setSubject={setSubject}
                 hasConversation={isGuest ? Boolean(guestConversationId) : Boolean(activeConversationId)}
                 isUser={!isGuest}
+                isAdminView={false}
+                isAdminConsole={isAdminConsole}
+                isMobile={isMobile}
                 typingNotice={typingNotice}
                 guestName={guestName}
                 guestEmail={guestEmail}
@@ -584,6 +821,9 @@ function ChatPanel({
   setSubject,
   hasConversation,
   isUser,
+  isAdminView,
+  isAdminConsole,
+  isMobile,
   typingNotice,
   showGuestFields,
   guestName,
@@ -603,6 +843,9 @@ function ChatPanel({
   setSubject: (value: string) => void;
   hasConversation: boolean;
   isUser: boolean;
+  isAdminView: boolean;
+  isAdminConsole: boolean;
+  isMobile: boolean;
   typingNotice: string;
   showGuestFields?: boolean;
   guestName?: string;
@@ -646,20 +889,23 @@ function ChatPanel({
         </div>
       ) : null}
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50 dark:bg-gray-950">
+      <div className={`flex-1 overflow-y-auto p-3 pb-24 space-y-2 ${isAdminConsole || isMobile ? 'bg-[#efeae2] dark:bg-gray-950' : 'bg-gray-50 dark:bg-gray-950'}`}>
         {messages.length ? (
           messages.map((message) => (
             <div
               key={message.id}
               className={`max-w-[85%] px-3 py-2 rounded text-sm ${
-                message.sender_role === 'admin'
-                  ? 'bg-black text-white'
-                  : 'bg-white dark:bg-gray-800 text-black dark:text-white ml-auto'
+                (isAdminView && message.sender_role === 'admin') || (!isAdminView && message.sender_role !== 'admin')
+                  ? `ml-auto ${isAdminConsole || isMobile ? 'bg-[#b42318] text-white rounded-2xl rounded-br-md shadow-sm' : 'bg-black text-white'}`
+                  : `${isAdminConsole || isMobile ? 'bg-white text-[#111b21] rounded-2xl rounded-bl-md shadow-sm' : 'bg-white dark:bg-gray-800 text-black dark:text-white'}`
               }`}
             >
+              <p className="text-[10px] font-semibold opacity-80 mb-1">
+                {message.sender_name || message.sender?.name || (message.sender_role === 'admin' ? 'Admin' : message.sender_role === 'guest' ? 'Guest' : 'User')}
+              </p>
               <p>{message.message || '[Attachment]'}</p>
               <p className="text-[10px] opacity-70 mt-1">
-                {new Date(message.created_at).toLocaleTimeString()}
+                {formatTimeSafe(message.created_at)}
               </p>
             </div>
           ))
@@ -673,7 +919,7 @@ function ChatPanel({
         ) : null}
       </div>
 
-      <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+      <div className={`p-3 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 ${isAdminConsole || isMobile ? 'bg-[#f0f2f5] dark:bg-gray-900' : ''}`}>
         <div className="flex items-center gap-2">
           <input
             ref={fileInputRef}

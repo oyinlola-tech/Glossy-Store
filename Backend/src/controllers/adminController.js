@@ -1,7 +1,7 @@
 const {
   Category, Product, ProductImage, ProductColor, ProductSize, ProductVariant,
   FlashSale, FlashSaleProduct, Coupon, ContactMessage, User, Order, OrderItem,
-  PaystackEvent,
+  PaystackEvent, sequelize,
 } = require('../models');
 const { sendContactReplyEmail } = require('../services/emailService');
 const {
@@ -26,18 +26,20 @@ const {
   productUpdateSchema,
   productIdParamSchema,
 } = require('../validations/productValidation');
+const { idParamSchema } = require('../validations/commonValidation');
 
 const validateBody = (schema, body) => schema.validate(body, { abortEarly: true, stripUnknown: true });
 const validateParams = (schema, params) => schema.validate(params, { abortEarly: true, convert: true, stripUnknown: true });
 
-const syncProductStockFromVariants = async (productId) => {
+const syncProductStockFromVariants = async (productId, transaction = undefined) => {
   const variants = await ProductVariant.findAll({
     where: { product_id: productId },
     attributes: ['stock'],
+    transaction,
   });
   if (!variants.length) return;
   const totalStock = variants.reduce((sum, variant) => sum + Number(variant.stock || 0), 0);
-  await Product.update({ stock: totalStock }, { where: { id: productId } });
+  await Product.update({ stock: totalStock }, { where: { id: productId }, transaction });
 };
 
 // ---------- Admin Users ----------
@@ -81,6 +83,12 @@ exports.createCategory = async (req, res, next) => {
     const { error, value } = validateBody(categoryCreateSchema, req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
     const { name, description, parent_id } = value;
+    if (parent_id) {
+      const parent = await Category.findByPk(parent_id);
+      if (!parent) {
+        return res.status(400).json({ error: 'Parent category not found' });
+      }
+    }
     const category = await Category.create({ name, description, parent_id });
     res.status(201).json(category);
   } catch (err) {
@@ -125,12 +133,21 @@ exports.deleteAdminUser = async (req, res, next) => {
 
 exports.updateCategory = async (req, res, next) => {
   try {
-    const paramValidation = validateParams(productIdParamSchema, req.params);
+    const paramValidation = validateParams(idParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
     const bodyValidation = validateBody(categoryUpdateSchema, req.body);
     if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
     const category = await Category.findByPk(paramValidation.value.id);
     if (!category) return res.status(404).json({ error: 'Category not found' });
+    if (bodyValidation.value.parent_id) {
+      if (Number(bodyValidation.value.parent_id) === Number(category.id)) {
+        return res.status(400).json({ error: 'Category cannot be its own parent' });
+      }
+      const parent = await Category.findByPk(bodyValidation.value.parent_id);
+      if (!parent) {
+        return res.status(400).json({ error: 'Parent category not found' });
+      }
+    }
     await category.update(bodyValidation.value);
     res.json(category);
   } catch (err) {
@@ -140,10 +157,18 @@ exports.updateCategory = async (req, res, next) => {
 
 exports.deleteCategory = async (req, res, next) => {
   try {
-    const paramValidation = validateParams(productIdParamSchema, req.params);
+    const paramValidation = validateParams(idParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
     const category = await Category.findByPk(paramValidation.value.id);
     if (!category) return res.status(404).json({ error: 'Category not found' });
+    const childCount = await Category.count({ where: { parent_id: category.id } });
+    if (childCount > 0) {
+      return res.status(409).json({ error: 'Category has subcategories and cannot be deleted' });
+    }
+    const productCount = await Product.count({ where: { category_id: category.id } });
+    if (productCount > 0) {
+      return res.status(409).json({ error: 'Category has products and cannot be deleted' });
+    }
     await category.destroy();
     res.json({ message: 'Category deleted' });
   } catch (err) {
@@ -166,7 +191,7 @@ exports.getProducts = async (req, res, next) => {
 
 exports.getProduct = async (req, res, next) => {
   try {
-    const paramValidation = validateParams(productIdParamSchema, req.params);
+    const paramValidation = validateParams(idParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
     const product = await Product.findByPk(paramValidation.value.id, {
       include: [{ model: ProductImage }, { model: ProductColor }, { model: ProductSize }, { model: ProductVariant }],
@@ -195,37 +220,45 @@ exports.createProduct = async (req, res, next) => {
       variants,
     } = value;
 
-    const product = await Product.create({
-      category_id,
-      name,
-      description,
-      base_price,
-      compare_at_price: compare_at_price || null,
-      discount_label: discount_label || null,
-      stock,
+    const category = await Category.findByPk(category_id);
+    if (!category) {
+      return res.status(400).json({ error: 'Category not found' });
+    }
+
+    const product = await sequelize.transaction(async (transaction) => {
+      const created = await Product.create({
+        category_id,
+        name,
+        description,
+        base_price,
+        compare_at_price: compare_at_price || null,
+        discount_label: discount_label || null,
+        stock,
+      }, { transaction });
+
+      if (colors && colors.length) {
+        await ProductColor.bulkCreate(colors.map((c) => ({ ...c, product_id: created.id })), { transaction });
+      }
+
+      if (sizes && sizes.length) {
+        await ProductSize.bulkCreate(sizes.map((s) => ({ size: s, product_id: created.id })), { transaction });
+      }
+
+      if (variants && variants.length) {
+        await ProductVariant.bulkCreate(variants.map((v) => ({ ...v, product_id: created.id })), { transaction });
+        await syncProductStockFromVariants(created.id, transaction);
+      }
+
+      if (req.files && req.files.length) {
+        const images = req.files.map((file, index) => ({
+          product_id: created.id,
+          image_url: `/uploads/${file.filename}`,
+          sort_order: index,
+        }));
+        await ProductImage.bulkCreate(images, { transaction });
+      }
+      return created;
     });
-
-    if (colors && colors.length) {
-      await ProductColor.bulkCreate(colors.map((c) => ({ ...c, product_id: product.id })));
-    }
-
-    if (sizes && sizes.length) {
-      await ProductSize.bulkCreate(sizes.map((s) => ({ size: s, product_id: product.id })));
-    }
-
-    if (variants && variants.length) {
-      await ProductVariant.bulkCreate(variants.map((v) => ({ ...v, product_id: product.id })));
-      await syncProductStockFromVariants(product.id);
-    }
-
-    if (req.files && req.files.length) {
-      const images = req.files.map((file, index) => ({
-        product_id: product.id,
-        image_url: `/uploads/${file.filename}`,
-        sort_order: index,
-      }));
-      await ProductImage.bulkCreate(images);
-    }
 
     res.status(201).json(product);
   } catch (err) {
@@ -235,44 +268,58 @@ exports.createProduct = async (req, res, next) => {
 
 exports.updateProduct = async (req, res, next) => {
   try {
-    const paramValidation = validateParams(productIdParamSchema, req.params);
+    const paramValidation = validateParams(idParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
     const bodyValidation = validateBody(productUpdateSchema, req.body);
     if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
     const product = await Product.findByPk(paramValidation.value.id);
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
-    await product.update(bodyValidation.value);
-
-    // Handle colors: replace all (simplified)
-    if (bodyValidation.value.colors) {
-      await ProductColor.destroy({ where: { product_id: product.id } });
-      await ProductColor.bulkCreate(bodyValidation.value.colors.map((c) => ({ ...c, product_id: product.id })));
+    if (bodyValidation.value.category_id) {
+      const category = await Category.findByPk(bodyValidation.value.category_id);
+      if (!category) {
+        return res.status(400).json({ error: 'Category not found' });
+      }
     }
 
-    // Handle sizes
-    if (bodyValidation.value.sizes) {
-      await ProductSize.destroy({ where: { product_id: product.id } });
-      await ProductSize.bulkCreate(bodyValidation.value.sizes.map((s) => ({ size: s, product_id: product.id })));
-    }
+    await sequelize.transaction(async (transaction) => {
+      await product.update(bodyValidation.value, { transaction });
 
-    // Handle variants
-    if (bodyValidation.value.variants) {
-      await ProductVariant.destroy({ where: { product_id: product.id } });
-      await ProductVariant.bulkCreate(bodyValidation.value.variants.map((v) => ({ ...v, product_id: product.id })));
-      await syncProductStockFromVariants(product.id);
-    }
+      if (bodyValidation.value.colors) {
+        await ProductColor.destroy({ where: { product_id: product.id }, transaction });
+        await ProductColor.bulkCreate(
+          bodyValidation.value.colors.map((c) => ({ ...c, product_id: product.id })),
+          { transaction }
+        );
+      }
 
-    // Handle images: new images replace old ones (simplified)
-    if (req.files && req.files.length) {
-      await ProductImage.destroy({ where: { product_id: product.id } });
-      const images = req.files.map((file, index) => ({
-        product_id: product.id,
-        image_url: `/uploads/${file.filename}`,
-        sort_order: index,
-      }));
-      await ProductImage.bulkCreate(images);
-    }
+      if (bodyValidation.value.sizes) {
+        await ProductSize.destroy({ where: { product_id: product.id }, transaction });
+        await ProductSize.bulkCreate(
+          bodyValidation.value.sizes.map((s) => ({ size: s, product_id: product.id })),
+          { transaction }
+        );
+      }
+
+      if (bodyValidation.value.variants) {
+        await ProductVariant.destroy({ where: { product_id: product.id }, transaction });
+        await ProductVariant.bulkCreate(
+          bodyValidation.value.variants.map((v) => ({ ...v, product_id: product.id })),
+          { transaction }
+        );
+        await syncProductStockFromVariants(product.id, transaction);
+      }
+
+      if (req.files && req.files.length) {
+        await ProductImage.destroy({ where: { product_id: product.id }, transaction });
+        const images = req.files.map((file, index) => ({
+          product_id: product.id,
+          image_url: `/uploads/${file.filename}`,
+          sort_order: index,
+        }));
+        await ProductImage.bulkCreate(images, { transaction });
+      }
+    });
 
     res.json(product);
   } catch (err) {
@@ -282,7 +329,7 @@ exports.updateProduct = async (req, res, next) => {
 
 exports.deleteProduct = async (req, res, next) => {
   try {
-    const paramValidation = validateParams(productIdParamSchema, req.params);
+    const paramValidation = validateParams(idParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
     const product = await Product.findByPk(paramValidation.value.id);
     if (!product) return res.status(404).json({ error: 'Product not found' });
@@ -327,7 +374,7 @@ exports.getFlashSales = async (req, res, next) => {
 
 exports.updateFlashSale = async (req, res, next) => {
   try {
-    const paramValidation = validateParams(productIdParamSchema, req.params);
+    const paramValidation = validateParams(idParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
     const bodyValidation = validateBody(flashSaleUpdateSchema, req.body);
     if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
@@ -353,7 +400,7 @@ exports.updateFlashSale = async (req, res, next) => {
 
 exports.deleteFlashSale = async (req, res, next) => {
   try {
-    const paramValidation = validateParams(productIdParamSchema, req.params);
+    const paramValidation = validateParams(idParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
     const flashSale = await FlashSale.findByPk(paramValidation.value.id);
     if (!flashSale) return res.status(404).json({ error: 'Flash sale not found' });
@@ -387,7 +434,7 @@ exports.getCoupons = async (req, res, next) => {
 
 exports.updateCoupon = async (req, res, next) => {
   try {
-    const paramValidation = validateParams(productIdParamSchema, req.params);
+    const paramValidation = validateParams(idParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
     const bodyValidation = validateBody(couponUpdateSchema, req.body);
     if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });

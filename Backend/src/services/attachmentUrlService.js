@@ -1,6 +1,19 @@
 const crypto = require('crypto');
 
-const getSecret = () => process.env.ATTACHMENT_URL_SECRET || process.env.JWT_SECRET;
+let nonProdSecret = null;
+
+const getSecret = () => {
+  const raw = String(process.env.ATTACHMENT_URL_SECRET || process.env.JWT_SECRET || '').trim();
+  if (raw) return raw;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('ATTACHMENT_URL_SECRET is not configured');
+  }
+  if (!nonProdSecret) {
+    nonProdSecret = crypto.randomBytes(32).toString('hex');
+    console.warn('[support] Using generated in-memory attachment signing secret for non-production mode');
+  }
+  return nonProdSecret;
+};
 
 const signPayload = (attachmentId, userId, expiresAt) => {
   const secret = getSecret();
@@ -17,10 +30,16 @@ const createSignedAttachmentUrl = (attachmentId, userId, basePath = '/api/suppor
 
 const verifySignedAttachmentUrl = ({ attachmentId, userId, expires, sig }) => {
   if (!expires || !sig) return false;
+  if (!/^[a-f0-9]+$/i.test(String(sig))) return false;
   const expiresAt = Number(expires);
   if (!Number.isFinite(expiresAt) || Date.now() > expiresAt) return false;
-  const expected = signPayload(attachmentId, userId, expiresAt);
-  const sigBuffer = Buffer.from(sig, 'hex');
+  let expected;
+  try {
+    expected = signPayload(attachmentId, userId, expiresAt);
+  } catch {
+    return false;
+  }
+  const sigBuffer = Buffer.from(String(sig), 'hex');
   const expectedBuffer = Buffer.from(expected, 'hex');
   if (sigBuffer.length !== expectedBuffer.length) return false;
   return crypto.timingSafeEqual(sigBuffer, expectedBuffer);

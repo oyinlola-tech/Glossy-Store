@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import * as api from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function SuperAdminAdminsPage() {
+  const { user } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [form, setForm] = useState({ name: '', email: '', password: '' });
 
   const loadUsers = async () => {
@@ -42,6 +45,31 @@ export function SuperAdminAdminsPage() {
     }
   };
 
+  const removeAdmin = async (target: any) => {
+    if (!target?.id) return;
+    if (target.is_super_admin) {
+      toast.error('Super admin account cannot be deleted');
+      return;
+    }
+    if (String(target.id) === String(user?.id)) {
+      toast.error('You cannot delete your own admin account');
+      return;
+    }
+    const confirmed = window.confirm(`Delete admin "${target.name}" (${target.email})? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeletingId(Number(target.id));
+    try {
+      await api.deleteAdminUser(target.id);
+      setUsers((prev) => prev.filter((item) => String(item.id) !== String(target.id)));
+      toast.success('Admin deleted');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete admin');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (loading) return <div className="p-8 text-gray-500 dark:text-gray-400">Loading admin users...</div>;
 
   return (
@@ -54,10 +82,20 @@ export function SuperAdminAdminsPage() {
         <button disabled={saving} className="bg-red-500 text-white rounded px-4 py-2 hover:bg-red-600 disabled:opacity-60">{saving ? 'Creating...' : 'Create Admin'}</button>
       </form>
       <div className="space-y-3">
-        {users.map((user) => (
-          <div key={user.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-            <p className="font-semibold text-black dark:text-white">{user.name}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
+        {users.map((admin) => (
+          <div key={admin.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow flex items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold text-black dark:text-white">{admin.name}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{admin.email}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void removeAdmin(admin)}
+              disabled={deletingId === Number(admin.id) || admin.is_super_admin || String(admin.id) === String(user?.id)}
+              className="bg-red-600 text-white rounded px-3 py-2 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {deletingId === Number(admin.id) ? 'Deleting...' : 'Delete'}
+            </button>
           </div>
         ))}
       </div>

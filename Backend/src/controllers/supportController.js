@@ -20,6 +20,8 @@ const {
   getUnreadCounts,
 } = require('../services/supportChatService');
 
+const SUPPORT_UPLOAD_DIR = path.resolve(__dirname, '..', '..', 'private_uploads', 'support');
+
 const getGuestToken = (req) => req.header('x-guest-token') || req.query.guest_token;
 
 const isValidEmail = (value) => /\S+@\S+\.\S+/.test(String(value || '').trim());
@@ -49,6 +51,9 @@ const toSocketSafeMessage = (message) => ({
 
 exports.createConversation = async (req, res, next) => {
   try {
+    if (req.user?.role === 'admin') {
+      return res.status(403).json({ error: 'Admins cannot start new conversations. Wait for a user ticket.' });
+    }
     const { subject, message } = req.body;
     const normalizedSubject = subject ? String(subject).trim() : '';
     if (normalizedSubject.length > 120) {
@@ -63,7 +68,11 @@ exports.createConversation = async (req, res, next) => {
 
     let firstMessage = null;
     const attachments = toAttachmentPayload(req.files);
-    if ((message && String(message).trim()) || attachments.length) {
+    const hasMessage = Boolean(message && String(message).trim());
+    if (!hasMessage && attachments.length === 0) {
+      return res.status(400).json({ error: 'Message or attachment is required' });
+    }
+    if (hasMessage || attachments.length) {
       firstMessage = await createMessage({
         conversationId: conversation.id,
         senderUser: req.user,
@@ -108,7 +117,11 @@ exports.createGuestConversation = async (req, res, next) => {
 
     let firstMessage = null;
     const attachments = toAttachmentPayload(req.files);
-    if ((message && String(message).trim()) || attachments.length) {
+    const hasMessage = Boolean(message && String(message).trim());
+    if (!hasMessage && attachments.length === 0) {
+      return res.status(400).json({ error: 'Message or attachment is required' });
+    }
+    if (hasMessage || attachments.length) {
       firstMessage = await createMessage({
         conversationId: conversation.id,
         senderUser: { id: null, role: 'guest', name: normalizedName, email: normalizedEmail },
@@ -282,6 +295,9 @@ exports.downloadAttachment = async (req, res, next) => {
     }
 
     const absolutePath = path.resolve(attachment.storage_path);
+    if (!absolutePath.startsWith(`${SUPPORT_UPLOAD_DIR}${path.sep}`)) {
+      return res.status(400).json({ error: 'Invalid attachment path' });
+    }
     if (!fs.existsSync(absolutePath)) {
       return res.status(404).json({ error: 'Attachment file missing on server' });
     }

@@ -78,8 +78,17 @@ async function apiCall<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
         },
       });
 
+      const responseText = await response.text();
+      const payload = (() => {
+        if (!responseText) return {} as ApiErrorPayload;
+        try {
+          return JSON.parse(responseText) as ApiErrorPayload;
+        } catch {
+          return { message: responseText } as ApiErrorPayload;
+        }
+      })();
+
       if (!response.ok) {
-        const payload = await response.json().catch(() => ({} as ApiErrorPayload));
         const message = payload.error || payload.message || `Request failed (${response.status})`;
         const formattedMessage = payload.requestId ? `${message} (ref: ${payload.requestId})` : message;
         if (response.status === 401 && requireAuth) {
@@ -91,7 +100,14 @@ async function apiCall<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
       if (response.status === 204) {
         return undefined as T;
       }
-      return response.json() as Promise<T>;
+      if (!responseText) {
+        return undefined as T;
+      }
+      try {
+        return JSON.parse(responseText) as T;
+      } catch {
+        return responseText as unknown as T;
+      }
     } catch (error: any) {
       if (error?.name === 'AbortError') {
         lastError = new Error('Request timed out. Please try again.');
@@ -485,6 +501,11 @@ export const createAdminUser = (data: { name: string; email: string; password: s
     method: 'POST',
     requireAuth: true,
     body: JSON.stringify(data),
+  });
+export const deleteAdminUser = (id: number | string) =>
+  apiCall<{ message: string }>(`/admin/admin-users/${id}`, {
+    method: 'DELETE',
+    requireAuth: true,
   });
 export const getAdminProducts = () => apiCall('/admin/products', { requireAuth: true });
 export const getAdminProduct = (id: number | string) => apiCall(`/admin/products/${id}`, { requireAuth: true });

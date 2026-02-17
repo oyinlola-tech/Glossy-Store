@@ -12,6 +12,11 @@ const {
 const CHARGEBACK_REQUIRES_DISPUTE_STATUSES = new Set(['out_for_delivery', 'delivered']);
 const validateBody = (schema, body) => schema.validate(body, { abortEarly: true, stripUnknown: true });
 const validateParams = (schema, params) => schema.validate(params, { abortEarly: true, convert: true, stripUnknown: true });
+const createHttpError = (message, statusCode = 400) => {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+};
 
 const calculateItemPrice = (variant) => {
   const basePrice = Number(variant.Product.base_price);
@@ -175,6 +180,7 @@ exports.checkout = async (req, res, next) => {
     if (error) return res.status(400).json({ error: error.details[0].message });
     const { shippingAddress, couponCode, currency, paymentMethodId } = value;
     const userId = req.user.id;
+    const normalizedCouponCode = couponCode ? String(couponCode).trim().toUpperCase() : null;
 
     // Get user's cart
     const cart = await Cart.findOne({
@@ -222,27 +228,34 @@ exports.checkout = async (req, res, next) => {
       let welcomeDiscountAmount = 0;
       let welcomeDiscountTarget = null;
 
-      if (couponCode) {
+      if (normalizedCouponCode) {
         coupon = await Coupon.findOne({
           where: {
-            code: couponCode,
+            code: normalizedCouponCode,
             valid_from: { [Op.lte]: new Date() },
             valid_until: { [Op.gte]: new Date() },
-            usage_limit: { [Op.gt]: sequelize.col('used_count') },
+            [Op.or]: [
+              { usage_limit: null },
+              { usage_limit: { [Op.gt]: sequelize.col('used_count') } },
+            ],
           },
           transaction,
           lock: transaction.LOCK.UPDATE,
         });
-        if (coupon) {
-          if (coupon.discount_type === 'percentage') {
-            discount = (subtotal * Number(coupon.discount_value)) / 100;
-          } else {
-            discount = Number(coupon.discount_value);
-          }
-          discount = Math.min(discount, subtotal);
-          coupon.used_count = Number(coupon.used_count || 0) + 1;
-          await coupon.save({ transaction });
+        if (!coupon) {
+          throw createHttpError('Invalid or expired coupon');
         }
+        if (coupon.min_order_amount && subtotal < Number(coupon.min_order_amount)) {
+          throw createHttpError(`Minimum order amount is ${coupon.min_order_amount}`);
+        }
+        if (coupon.discount_type === 'percentage') {
+          discount = (subtotal * Number(coupon.discount_value)) / 100;
+        } else {
+          discount = Number(coupon.discount_value);
+        }
+        discount = Math.min(discount, subtotal);
+        coupon.used_count = Number(coupon.used_count || 0) + 1;
+        await coupon.save({ transaction });
       } else {
         const preview = await computeWelcomeDiscount({
           userId,
@@ -311,7 +324,8 @@ exports.checkout = async (req, res, next) => {
     if (!['NGN', 'USD'].includes(normalizedCurrency)) {
       return res.status(400).json({ error: 'Unsupported currency. Use NGN or USD.' });
     }
-    const callbackUrl = process.env.SQUAD_CALLBACK_URL || `${process.env.APP_BASE_URL || ''}/payment/verify`;
+    const baseUrl = process.env.APP_BASE_URL ? String(process.env.APP_BASE_URL).replace(/\/+$/, '') : '';
+    const callbackUrl = process.env.SQUAD_CALLBACK_URL || (baseUrl ? `${baseUrl}/payment/verify` : undefined);
     let paymentData;
     try {
       if (paymentMethodId) {
@@ -347,6 +361,9 @@ exports.checkout = async (req, res, next) => {
       } catch (rollbackErr) {
         console.error('Checkout rollback failed:', rollbackErr?.message || rollbackErr);
       }
+      if (paymentErr?.statusCode) {
+        return res.status(paymentErr.statusCode).json({ error: paymentErr.message });
+      }
       return res.status(502).json({ error: 'Unable to initialize payment. Please try again.' });
     }
 
@@ -359,6 +376,9 @@ exports.checkout = async (req, res, next) => {
       welcome_discount_target: checkoutResult.welcome_discount_target,
     });
   } catch (err) {
+    if (err?.statusCode) {
+      return res.status(err.statusCode).json({ error: err.message });
+    }
     if (String(err.message).startsWith('Insufficient stock')) {
       return res.status(409).json({ error: err.message });
     }

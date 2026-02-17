@@ -24,6 +24,14 @@ const errorHandler = (err, req, res, next) => {
     return res.status(401).json({ error: 'Invalid token', requestId });
   }
 
+  if (err.name === 'SequelizeValidationError') {
+    return res.status(400).json({ error: err.errors?.[0]?.message || 'Validation failed', requestId });
+  }
+
+  if (err.name === 'SequelizeUniqueConstraintError') {
+    return res.status(409).json({ error: err.errors?.[0]?.message || 'Duplicate record', requestId });
+  }
+
   if (statusCode >= 400 && statusCode < 500) {
     return res.status(statusCode).json({ error: err.message || 'Request failed', requestId });
   }

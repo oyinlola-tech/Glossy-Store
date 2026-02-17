@@ -3,6 +3,7 @@ const router = express.Router();
 const adminController = require('../controllers/adminController');
 const { authMiddleware, adminMiddleware, superAdminMiddleware } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const { secureProductImages } = require('../middleware/productImageSecurity');
 const sensitiveActionRateLimiter = require('../middleware/sensitiveActionRateLimiter');
 
 router.use(authMiddleware, adminMiddleware);
@@ -21,8 +22,8 @@ router.delete('/categories/:id', sensitiveActionRateLimiter, adminController.del
 // Products
 router.get('/products', adminController.getProducts);
 router.get('/products/:id', adminController.getProduct);
-router.post('/products', sensitiveActionRateLimiter, upload.array('images', 10), adminController.createProduct);
-router.put('/products/:id', sensitiveActionRateLimiter, upload.array('images', 10), adminController.updateProduct);
+router.post('/products', sensitiveActionRateLimiter, upload.array('images', 10), secureProductImages, adminController.createProduct);
+router.put('/products/:id', sensitiveActionRateLimiter, upload.array('images', 10), secureProductImages, adminController.updateProduct);
 router.delete('/products/:id', sensitiveActionRateLimiter, adminController.deleteProduct);
 
 // Flash Sales

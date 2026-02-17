@@ -33,7 +33,8 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => (
-    req.path === '/api/health'
+    req.method === 'OPTIONS'
+    || req.path === '/api/health'
     || req.path === '/api/info'
     || req.path === '/health'
     || req.path === '/info'

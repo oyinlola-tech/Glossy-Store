@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import * as api from '../services/api';
@@ -18,6 +18,7 @@ export function CheckoutPage() {
   const [selectedSavedMethodId, setSelectedSavedMethodId] = useState<number | null>(null);
   const [cart, setCart] = useState<api.CartView>({ items: [], subtotal: 0 });
   const [discountPreview, setDiscountPreview] = useState<api.DiscountPreviewResponse | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -120,6 +121,16 @@ export function CheckoutPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    const form = formRef.current;
+    if (form && !form.reportValidity()) {
+      return;
+    }
+    if (!cart.items.length) {
+      toast.error('Your cart is empty');
+      navigate('/cart');
+      return;
+    }
     setPaymentOpen(true);
   };
 
@@ -135,9 +146,9 @@ export function CheckoutPage() {
       <div className="container mx-auto px-4">
         <h1 className="text-3xl font-bold text-black dark:text-white mb-8">Checkout</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">First Name*</label>
@@ -169,7 +180,7 @@ export function CheckoutPage() {
                 <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">Email Address*</label>
                 <input type="email" name="email" required value={formData.email} onChange={handleChange} className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded text-black dark:text-white" />
               </div>
-            </form>
+            </div>
           </div>
 
           <div>
@@ -214,12 +225,12 @@ export function CheckoutPage() {
                   <span className="text-black dark:text-white font-semibold">{formatCurrency(total)}</span>
                 </div>
               </div>
-              <button onClick={handleSubmit} disabled={loading} className="w-full bg-red-500 text-white py-3 rounded hover:bg-red-600 disabled:opacity-50 font-semibold">
+              <button type="submit" disabled={loading} className="w-full bg-red-500 text-white py-3 rounded hover:bg-red-600 disabled:opacity-50 font-semibold">
                 {loading ? 'Placing Order...' : 'Place Order'}
               </button>
             </div>
           </div>
-        </div>
+        </form>
       </div>
 
       {paymentOpen ? (
@@ -227,10 +238,10 @@ export function CheckoutPage() {
           <div className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-900 p-6 shadow-2xl">
             <div className="flex items-start justify-between mb-4">
               <div>
-            <h2 className="text-xl font-bold text-black dark:text-white">Pay with Squad</h2>
+                <h2 className="text-xl font-bold text-black dark:text-white">Pay with Squad</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Choose your payment currency</p>
               </div>
-              <button onClick={() => setPaymentOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+              <button type="button" onClick={() => setPaymentOpen(false)} className="text-gray-500 hover:text-gray-700" aria-label="Close payment dialog">X</button>
             </div>
 
             <div className="space-y-3 mb-6">
@@ -257,7 +268,7 @@ export function CheckoutPage() {
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
                           Exp {String(method.exp_month || '--').padStart(2, '0')}/{method.exp_year || '----'}
-                          {method.is_default ? ' • Default' : ''}
+                          {method.is_default ? ' - Default' : ''}
                         </p>
                       </div>
                       <input

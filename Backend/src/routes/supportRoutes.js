@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const supportController = require('../controllers/supportController');
 const { authMiddleware } = require('../middleware/auth');
-const supportUpload = require('../middleware/supportUpload');
+const { supportUpload } = require('../middleware/supportUpload');
 const { secureSupportAttachments } = require('../middleware/supportAttachmentSecurity');
 const supportRateLimiter = require('../middleware/supportRateLimiter');
 

@@ -72,6 +72,10 @@ exports.addToWishlist = async (req, res, next) => {
     if (!Number.isInteger(productId) || productId <= 0) {
       return res.status(400).json({ error: 'Invalid product id' });
     }
+    const product = await Product.findByPk(productId);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
     const [item, created] = await Wishlist.findOrCreate({
       where: { user_id: req.user.id, product_id: productId },
     });

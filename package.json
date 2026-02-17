@@ -7,7 +7,7 @@
     "build": "vite build",
     "dev": "node scripts/start-all.cjs",
     "start:frontend": "vite",
-    "start:backend": "npm run dev --prefix Backend",
+    "start:backend": "npm run dev:backend-only --prefix Backend",
     "start": "node scripts/start-all.cjs"
   },
   "dependencies": {

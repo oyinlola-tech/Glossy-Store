@@ -5,6 +5,7 @@ const REQUIRED_PROD_KEYS = [
   'DB_NAME',
   'JWT_SECRET',
   'SQUAD_SECRET_KEY',
+  'ATTACHMENT_URL_SECRET',
 ];
 
 const OPTIONAL_WARN_KEYS = [
@@ -51,6 +52,16 @@ const validateEnvironment = () => {
   const paymentTokenSecret = String(process.env.PAYMENT_TOKEN_SECRET || '');
   if (isProduction && paymentTokenSecret.length < 32) {
     issues.push('PAYMENT_TOKEN_SECRET must be at least 32 characters in production');
+  }
+
+  const otpHashSecret = String(process.env.OTP_HASH_SECRET || '');
+  if (isProduction && otpHashSecret.length < 32) {
+    issues.push('OTP_HASH_SECRET must be at least 32 characters in production');
+  }
+
+  const attachmentSecret = String(process.env.ATTACHMENT_URL_SECRET || '');
+  if (isProduction && attachmentSecret.length < 32) {
+    issues.push('ATTACHMENT_URL_SECRET must be at least 32 characters in production');
   }
 
   if (issues.length) {

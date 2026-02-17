@@ -2,13 +2,13 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const uploadDir = path.join('private_uploads', 'support');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+const supportUploadDir = path.resolve(__dirname, '..', '..', 'private_uploads', 'support');
+if (!fs.existsSync(supportUploadDir)) {
+  fs.mkdirSync(supportUploadDir, { recursive: true });
 }
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
+  destination: (req, file, cb) => cb(null, supportUploadDir),
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
     cb(null, `support-${uniqueSuffix}${path.extname(file.originalname)}`);
@@ -43,4 +43,4 @@ const supportUpload = multer({
   },
 });
 
-module.exports = supportUpload;
+module.exports = { supportUpload, supportUploadDir };

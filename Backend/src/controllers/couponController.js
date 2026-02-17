@@ -1,10 +1,13 @@
 const { Coupon, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const { couponValidateSchema } = require('../validations/couponValidation');
 
 // Validate coupon (public endpoint for frontend to check before checkout)
 exports.validateCoupon = async (req, res, next) => {
   try {
-    const { code, cartTotal } = req.body;
+    const { error, value } = couponValidateSchema.validate(req.body, { abortEarly: true, stripUnknown: true });
+    if (error) return res.status(400).json({ valid: false, error: error.details[0].message });
+    const { code, cartTotal } = value;
     const coupon = await Coupon.findOne({
       where: {
         code,

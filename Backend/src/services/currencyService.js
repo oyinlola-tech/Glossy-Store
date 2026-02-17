@@ -58,16 +58,25 @@ const getRate = async (base, target) => {
 };
 
 const getCurrencyProfile = async (req) => {
-  const ip = getClientIp(req);
-  const geo = await getCurrencyForIp(ip);
-  const currency = geo.currency || DEFAULT_CURRENCY;
-  const rate = await getRate(DEFAULT_CURRENCY, currency);
-  return {
-    base: DEFAULT_CURRENCY,
-    currency,
-    locale: mapLocale(currency),
-    rate,
-  };
+  try {
+    const ip = getClientIp(req);
+    const geo = await getCurrencyForIp(ip);
+    const currency = geo.currency || DEFAULT_CURRENCY;
+    const rate = await getRate(DEFAULT_CURRENCY, currency);
+    return {
+      base: DEFAULT_CURRENCY,
+      currency,
+      locale: mapLocale(currency),
+      rate,
+    };
+  } catch {
+    return {
+      base: DEFAULT_CURRENCY,
+      currency: DEFAULT_CURRENCY,
+      locale: DEFAULT_LOCALE,
+      rate: 1,
+    };
+  }
 };
 
 module.exports = { getCurrencyProfile };

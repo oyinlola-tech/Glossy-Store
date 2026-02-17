@@ -6,7 +6,10 @@ const { upsertSavedCard } = require('../services/paymentMethodService');
 
 const safeEqualHex = (expectedHex, receivedHex) => {
   if (!expectedHex || !receivedHex) return false;
-  const expected = Buffer.from(expectedHex, 'hex');
+  if (!/^[a-f0-9]+$/i.test(String(expectedHex)) || !/^[a-f0-9]+$/i.test(String(receivedHex))) {
+    return false;
+  }
+  const expected = Buffer.from(String(expectedHex), 'hex');
   const received = Buffer.from(String(receivedHex), 'hex');
   if (expected.length === 0 || received.length === 0 || expected.length !== received.length) {
     return false;
@@ -214,6 +217,9 @@ exports.verify = async (req, res) => {
     return res.json({ status: status || 'unknown', reference, data });
   } catch (err) {
     console.error('Payment verification failed:', err?.message || err);
+    if (err?.statusCode) {
+      return res.status(err.statusCode).json({ error: err.message });
+    }
     return res.status(500).json({ error: 'Verification failed' });
   }
 };
