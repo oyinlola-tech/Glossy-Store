@@ -10,35 +10,36 @@ router.use(authMiddleware, adminMiddleware);
 router.get('/dashboard/summary', adminController.getDashboardSummary);
 
 // Admin account management (super admin only)
-router.post('/admin-users', superAdminMiddleware, adminController.createAdminUser);
+router.post('/admin-users', superAdminMiddleware, sensitiveActionRateLimiter, adminController.createAdminUser);
+router.delete('/admin-users/:id', superAdminMiddleware, sensitiveActionRateLimiter, adminController.deleteAdminUser);
 
 // Categories
-router.post('/categories', adminController.createCategory);
-router.put('/categories/:id', adminController.updateCategory);
-router.delete('/categories/:id', adminController.deleteCategory);
+router.post('/categories', sensitiveActionRateLimiter, adminController.createCategory);
+router.put('/categories/:id', sensitiveActionRateLimiter, adminController.updateCategory);
+router.delete('/categories/:id', sensitiveActionRateLimiter, adminController.deleteCategory);
 
 // Products
 router.get('/products', adminController.getProducts);
 router.get('/products/:id', adminController.getProduct);
-router.post('/products', upload.array('images', 10), adminController.createProduct);
-router.put('/products/:id', upload.array('images', 10), adminController.updateProduct);
-router.delete('/products/:id', adminController.deleteProduct);
+router.post('/products', sensitiveActionRateLimiter, upload.array('images', 10), adminController.createProduct);
+router.put('/products/:id', sensitiveActionRateLimiter, upload.array('images', 10), adminController.updateProduct);
+router.delete('/products/:id', sensitiveActionRateLimiter, adminController.deleteProduct);
 
 // Flash Sales
-router.post('/flash-sales', adminController.createFlashSale);
+router.post('/flash-sales', sensitiveActionRateLimiter, adminController.createFlashSale);
 router.get('/flash-sales', adminController.getFlashSales);
-router.put('/flash-sales/:id', adminController.updateFlashSale);
-router.delete('/flash-sales/:id', adminController.deleteFlashSale);
+router.put('/flash-sales/:id', sensitiveActionRateLimiter, adminController.updateFlashSale);
+router.delete('/flash-sales/:id', sensitiveActionRateLimiter, adminController.deleteFlashSale);
 
 // Coupons
-router.post('/coupons', adminController.createCoupon);
+router.post('/coupons', sensitiveActionRateLimiter, adminController.createCoupon);
 router.get('/coupons', adminController.getCoupons);
-router.put('/coupons/:id', adminController.updateCoupon);
-router.delete('/coupons/:id', adminController.deleteCoupon);
+router.put('/coupons/:id', sensitiveActionRateLimiter, adminController.updateCoupon);
+router.delete('/coupons/:id', sensitiveActionRateLimiter, adminController.deleteCoupon);
 
 // Contact Messages
 router.get('/contact-messages', adminController.getContactMessages);
-router.post('/contact-messages/:id/reply', adminController.replyToContactMessage);
+router.post('/contact-messages/:id/reply', sensitiveActionRateLimiter, adminController.replyToContactMessage);
 
 // Users
 router.get('/users', adminController.getUsers);

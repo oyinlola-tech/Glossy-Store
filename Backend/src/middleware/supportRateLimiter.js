@@ -5,6 +5,7 @@ const supportRateLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.user?.role === 'admin',
   message: 'Too many support chat requests. Please slow down.',
 });
 

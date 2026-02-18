@@ -22,6 +22,21 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
   .filter(Boolean);
 const isProduction = process.env.NODE_ENV === 'production';
 
+const parseBooleanEnv = (value, defaultValue = false) => {
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (!raw) return defaultValue;
+  return ['1', 'true', 'yes', 'on'].includes(raw);
+};
+
+const normalizeTableName = (entry) => {
+  if (typeof entry === 'string') return entry;
+  if (entry && typeof entry === 'object') {
+    const values = Object.values(entry);
+    if (values.length > 0) return String(values[0]);
+  }
+  return '';
+};
+
 const corsOrigin = (origin, callback) => {
   if (!origin) return callback(null, true);
   if (!isProduction && allowedOrigins.length === 0) return callback(null, true);
@@ -105,14 +120,31 @@ app.use(errorHandler);
 const initializeDatabase = async () => {
   await createDatabaseIfNotExists();
   await sequelize.authenticate();
-  const autoSync = String(process.env.AUTO_SYNC_MODELS || 'false').toLowerCase() === 'true';
-  if (autoSync) {
-    await sequelize.sync({ alter: true });
+
+  const queryInterface = sequelize.getQueryInterface();
+  const existingTablesRaw = await queryInterface.showAllTables();
+  const existingTables = new Set(
+    existingTablesRaw
+      .map((entry) => normalizeTableName(entry).toLowerCase())
+      .filter(Boolean)
+  );
+
+  const shouldBootstrapSchema = existingTables.size === 0 || !existingTables.has('users');
+  if (shouldBootstrapSchema) {
+    await sequelize.sync();
   }
-  const autoMigrate = String(process.env.AUTO_RUN_MIGRATIONS || 'false').toLowerCase() === 'true';
+
+  const autoSync = parseBooleanEnv(process.env.AUTO_SYNC_MODELS, false);
+  if (autoSync) {
+    const autoSyncAlter = parseBooleanEnv(process.env.AUTO_SYNC_ALTER, !isProduction);
+    await sequelize.sync({ alter: autoSyncAlter });
+  }
+
+  const autoMigrate = parseBooleanEnv(process.env.AUTO_RUN_MIGRATIONS, !isProduction);
   if (autoMigrate) {
     await runMigrations();
   }
+
   await seedSuperAdminFromEnv();
 };
 

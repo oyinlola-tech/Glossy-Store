@@ -1,17 +1,85 @@
 const Joi = require('joi');
 
-const productCreateSchema = Joi.object({
-  category_id: Joi.number().required(),
-  name: Joi.string().required(),
-  description: Joi.string().optional(),
-  base_price: Joi.number().positive().required(),
-  stock: Joi.number().integer().min(0).optional(),
-  colors: Joi.array().items(Joi.object({
-    color_name: Joi.string().required(),
-    color_code: Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/).required(),
-  })),
-  sizes: Joi.array().items(Joi.string()),
-  images: Joi.array().max(10),
+const productIdParamSchema = Joi.object({
+  id: Joi.number().integer().positive().required(),
 });
 
-module.exports = { productCreateSchema };
+const productQuerySchema = Joi.object({
+  category: Joi.number().integer().positive().optional(),
+  minPrice: Joi.number().min(0).optional(),
+  maxPrice: Joi.number().min(0).optional(),
+  rating: Joi.number().min(1).max(5).optional(),
+  flashSale: Joi.boolean().truthy('true').falsy('false').optional(),
+  newArrivals: Joi.boolean().truthy('true').falsy('false').optional(),
+  page: Joi.number().integer().min(1).max(10000).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+}).custom((value, helpers) => {
+  if (value.minPrice !== undefined && value.maxPrice !== undefined && value.minPrice > value.maxPrice) {
+    return helpers.error('any.invalid');
+  }
+  return value;
+}, 'min/max price validation');
+
+const ratingSchema = Joi.object({
+  rating: Joi.number().min(1).max(5).required(),
+  review: Joi.string().trim().max(1000).allow('', null).optional(),
+});
+
+const commentSchema = Joi.object({
+  comment: Joi.string().trim().min(1).max(2000).required(),
+});
+
+const productCreateSchema = Joi.object({
+  category_id: Joi.number().integer().positive().required(),
+  name: Joi.string().trim().min(2).max(200).required(),
+  description: Joi.string().trim().max(5000).allow('', null).optional(),
+  base_price: Joi.number().positive().required(),
+  compare_at_price: Joi.number().positive().allow(null).optional(),
+  discount_label: Joi.string().trim().max(100).allow('', null).optional(),
+  stock: Joi.number().integer().min(0).optional(),
+  colors: Joi.array().items(Joi.object({
+    color_name: Joi.string().trim().min(1).max(50).required(),
+    color_code: Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/).required(),
+  })).optional(),
+  sizes: Joi.array().items(Joi.string().trim().min(1).max(20)).optional(),
+  variants: Joi.array().items(Joi.object({
+    color_id: Joi.number().integer().positive().allow(null).optional(),
+    size_id: Joi.number().integer().positive().allow(null).optional(),
+    sku: Joi.string().trim().max(64).allow('', null).optional(),
+    price_adjustment: Joi.number().min(-100000).max(100000).optional(),
+    stock: Joi.number().integer().min(0).optional(),
+    image_id: Joi.number().integer().positive().allow(null).optional(),
+  })).optional(),
+});
+
+const productUpdateSchema = Joi.object({
+  category_id: Joi.number().integer().positive().optional(),
+  name: Joi.string().trim().min(2).max(200).optional(),
+  description: Joi.string().trim().max(5000).allow('', null).optional(),
+  base_price: Joi.number().positive().optional(),
+  compare_at_price: Joi.number().positive().allow(null).optional(),
+  discount_label: Joi.string().trim().max(100).allow('', null).optional(),
+  stock: Joi.number().integer().min(0).optional(),
+  colors: Joi.array().items(Joi.object({
+    color_name: Joi.string().trim().min(1).max(50).required(),
+    color_code: Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/).required(),
+  })).optional(),
+  sizes: Joi.array().items(Joi.string().trim().min(1).max(20)).optional(),
+  variants: Joi.array().items(Joi.object({
+    color_id: Joi.number().integer().positive().allow(null).optional(),
+    size_id: Joi.number().integer().positive().allow(null).optional(),
+    sku: Joi.string().trim().max(64).allow('', null).optional(),
+    price_adjustment: Joi.number().min(-100000).max(100000).optional(),
+    stock: Joi.number().integer().min(0).optional(),
+    image_id: Joi.number().integer().positive().allow(null).optional(),
+  })).optional(),
+}).min(1);
+
+module.exports = {
+  productCreateSchema,
+  productUpdateSchema,
+  productIdParamSchema,
+  productQuerySchema,
+  ratingSchema,
+  commentSchema,
+};

@@ -10,6 +10,36 @@ const { createSignedAttachmentUrl } = require('./attachmentUrlService');
 const { sendContactReplyEmail } = require('./emailService');
 
 const SUPPORT_MESSAGE_MAX_LENGTH = 2000;
+let supportSchemaReadyPromise = null;
+
+const ensureSupportSchema = async () => {
+  if (!supportSchemaReadyPromise) {
+    supportSchemaReadyPromise = (async () => {
+      const queryInterface = sequelize.getQueryInterface();
+      const columns = await queryInterface.describeTable('support_messages');
+      if (!columns.sender_name) {
+        await queryInterface.addColumn('support_messages', 'sender_name', {
+          type: sequelize.Sequelize.STRING,
+          allowNull: true,
+        });
+        await queryInterface.sequelize.query(`
+          UPDATE support_messages sm
+          LEFT JOIN users u ON u.id = sm.sender_user_id
+          LEFT JOIN support_conversations sc ON sc.id = sm.support_conversation_id
+          SET sm.sender_name = CASE
+            WHEN sm.sender_role = 'guest' THEN COALESCE(NULLIF(sc.guest_name, ''), NULLIF(sc.guest_email, ''), 'Guest')
+            ELSE COALESCE(NULLIF(u.name, ''), NULLIF(u.email, ''), 'User')
+          END
+          WHERE sm.sender_name IS NULL OR sm.sender_name = ''
+        `);
+      }
+    })().catch((err) => {
+      supportSchemaReadyPromise = null;
+      throw err;
+    });
+  }
+  return supportSchemaReadyPromise;
+};
 
 const getConversationById = async (conversationId) => {
   return SupportConversation.findByPk(conversationId, {
@@ -50,6 +80,18 @@ const formatMessageForUser = (message, user) => {
   }));
   return {
     ...json,
+    sender_name: json.sender_name || json.User?.name || (json.sender_role === 'guest' ? 'Guest' : 'User'),
+    sender: json.User ? {
+      id: json.User.id,
+      name: json.User.name,
+      email: json.User.email,
+      role: json.User.role,
+    } : {
+      id: null,
+      name: json.sender_name || 'Guest',
+      email: null,
+      role: json.sender_role,
+    },
     SupportMessageAttachments: attachments,
     receipts: (json.SupportMessageReceipts || []).map((receipt) => ({
       id: receipt.id,
@@ -80,6 +122,7 @@ const getRecipientUsers = async (conversation, senderRole, transaction) => {
 };
 
 const createMessage = async ({ conversationId, senderUser, message, attachments = [], skipAccessCheck = false }) => {
+  await ensureSupportSchema();
   const conversation = await SupportConversation.findByPk(conversationId);
   if (!conversation) {
     throw new Error('Support conversation not found');
@@ -98,6 +141,13 @@ const createMessage = async ({ conversationId, senderUser, message, attachments 
   const createdMessage = await sequelize.transaction(async (transaction) => {
     const senderRole = senderUser?.role === 'admin' ? 'admin' : senderUser?.role === 'guest' ? 'guest' : 'user';
     const senderUserId = senderRole === 'guest' ? null : senderUser?.id ?? null;
+    const senderName = String(
+      senderUser?.name
+      || (senderRole === 'guest' ? conversation.guest_name : '')
+      || senderUser?.email
+      || (senderRole === 'guest' ? conversation.guest_email : '')
+      || (senderRole === 'admin' ? 'Admin' : senderRole === 'guest' ? 'Guest' : 'User')
+    ).trim().slice(0, 120);
     if (senderRole !== 'guest' && !senderUserId) {
       throw new Error('Sender user is required');
     }
@@ -106,6 +156,7 @@ const createMessage = async ({ conversationId, senderUser, message, attachments 
       support_conversation_id: conversationId,
       sender_user_id: senderUserId,
       sender_role: senderRole,
+      sender_name: senderName,
       recipient_role: getRecipientRole(senderRole, conversation),
       message: trimmedMessage || null,
       is_read: false,

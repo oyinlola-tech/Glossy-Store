@@ -9,6 +9,23 @@ const {
   adminUpdateOrderStatusSchema,
   adminResolveDisputeSchema,
 } = require('../validations/orderValidation');
+const {
+  adminCreateUserSchema,
+  adminUserIdParamSchema,
+  categoryCreateSchema,
+  categoryUpdateSchema,
+  flashSaleCreateSchema,
+  flashSaleUpdateSchema,
+  couponCreateSchema,
+  couponUpdateSchema,
+  contactReplySchema,
+  paymentEventQuerySchema,
+} = require('../validations/adminValidation');
+const {
+  productCreateSchema,
+  productUpdateSchema,
+  productIdParamSchema,
+} = require('../validations/productValidation');
 
 const validateBody = (schema, body) => schema.validate(body, { abortEarly: true, stripUnknown: true });
 const validateParams = (schema, params) => schema.validate(params, { abortEarly: true, convert: true, stripUnknown: true });
@@ -26,16 +43,9 @@ const syncProductStockFromVariants = async (productId) => {
 // ---------- Admin Users ----------
 exports.createAdminUser = async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'name, email and password are required' });
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: 'Invalid email format' });
-    }
-    if (String(password).length < 8) {
-      return res.status(400).json({ error: 'password must be at least 8 characters' });
-    }
+    const { error, value } = validateBody(adminCreateUserSchema, req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+    const { name, email, password } = value;
 
     const existing = await User.findOne({ where: { email } });
     if (existing) {
@@ -68,7 +78,9 @@ exports.createAdminUser = async (req, res, next) => {
 // ---------- Categories ----------
 exports.createCategory = async (req, res, next) => {
   try {
-    const { name, description, parent_id } = req.body;
+    const { error, value } = validateBody(categoryCreateSchema, req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+    const { name, description, parent_id } = value;
     const category = await Category.create({ name, description, parent_id });
     res.status(201).json(category);
   } catch (err) {
@@ -76,11 +88,50 @@ exports.createCategory = async (req, res, next) => {
   }
 };
 
+exports.deleteAdminUser = async (req, res, next) => {
+  try {
+    const paramValidation = validateParams(adminUserIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const adminId = paramValidation.value.id;
+
+    if (Number(req.user.id) === Number(adminId)) {
+      return res.status(400).json({ error: 'You cannot delete your own admin account' });
+    }
+
+    const adminUser = await User.findByPk(adminId);
+    if (!adminUser) {
+      return res.status(404).json({ error: 'Admin user not found' });
+    }
+
+    if (adminUser.role !== 'admin') {
+      return res.status(400).json({ error: 'Target user is not an admin account' });
+    }
+
+    if (adminUser.is_super_admin) {
+      return res.status(403).json({ error: 'Super admin accounts cannot be deleted' });
+    }
+
+    await User.update(
+      { created_by_admin_id: null },
+      { where: { created_by_admin_id: adminUser.id } }
+    );
+
+    await adminUser.destroy();
+    return res.json({ message: 'Admin user deleted' });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 exports.updateCategory = async (req, res, next) => {
   try {
-    const category = await Category.findByPk(req.params.id);
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const bodyValidation = validateBody(categoryUpdateSchema, req.body);
+    if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
+    const category = await Category.findByPk(paramValidation.value.id);
     if (!category) return res.status(404).json({ error: 'Category not found' });
-    await category.update(req.body);
+    await category.update(bodyValidation.value);
     res.json(category);
   } catch (err) {
     next(err);
@@ -89,7 +140,9 @@ exports.updateCategory = async (req, res, next) => {
 
 exports.deleteCategory = async (req, res, next) => {
   try {
-    const category = await Category.findByPk(req.params.id);
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const category = await Category.findByPk(paramValidation.value.id);
     if (!category) return res.status(404).json({ error: 'Category not found' });
     await category.destroy();
     res.json({ message: 'Category deleted' });
@@ -113,7 +166,9 @@ exports.getProducts = async (req, res, next) => {
 
 exports.getProduct = async (req, res, next) => {
   try {
-    const product = await Product.findByPk(req.params.id, {
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const product = await Product.findByPk(paramValidation.value.id, {
       include: [{ model: ProductImage }, { model: ProductColor }, { model: ProductSize }, { model: ProductVariant }],
     });
     if (!product) return res.status(404).json({ error: 'Product not found' });
@@ -125,6 +180,8 @@ exports.getProduct = async (req, res, next) => {
 
 exports.createProduct = async (req, res, next) => {
   try {
+    const { error, value } = validateBody(productCreateSchema, req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
     const {
       category_id,
       name,
@@ -136,7 +193,7 @@ exports.createProduct = async (req, res, next) => {
       colors,
       sizes,
       variants,
-    } = req.body;
+    } = value;
 
     const product = await Product.create({
       category_id,
@@ -149,15 +206,15 @@ exports.createProduct = async (req, res, next) => {
     });
 
     if (colors && colors.length) {
-      await ProductColor.bulkCreate(colors.map(c => ({ ...c, product_id: product.id })));
+      await ProductColor.bulkCreate(colors.map((c) => ({ ...c, product_id: product.id })));
     }
 
     if (sizes && sizes.length) {
-      await ProductSize.bulkCreate(sizes.map(s => ({ size: s, product_id: product.id })));
+      await ProductSize.bulkCreate(sizes.map((s) => ({ size: s, product_id: product.id })));
     }
 
     if (variants && variants.length) {
-      await ProductVariant.bulkCreate(variants.map(v => ({ ...v, product_id: product.id })));
+      await ProductVariant.bulkCreate(variants.map((v) => ({ ...v, product_id: product.id })));
       await syncProductStockFromVariants(product.id);
     }
 
@@ -178,27 +235,31 @@ exports.createProduct = async (req, res, next) => {
 
 exports.updateProduct = async (req, res, next) => {
   try {
-    const product = await Product.findByPk(req.params.id);
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const bodyValidation = validateBody(productUpdateSchema, req.body);
+    if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
+    const product = await Product.findByPk(paramValidation.value.id);
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
-    await product.update(req.body);
+    await product.update(bodyValidation.value);
 
     // Handle colors: replace all (simplified)
-    if (req.body.colors) {
+    if (bodyValidation.value.colors) {
       await ProductColor.destroy({ where: { product_id: product.id } });
-      await ProductColor.bulkCreate(req.body.colors.map(c => ({ ...c, product_id: product.id })));
+      await ProductColor.bulkCreate(bodyValidation.value.colors.map((c) => ({ ...c, product_id: product.id })));
     }
 
     // Handle sizes
-    if (req.body.sizes) {
+    if (bodyValidation.value.sizes) {
       await ProductSize.destroy({ where: { product_id: product.id } });
-      await ProductSize.bulkCreate(req.body.sizes.map(s => ({ size: s, product_id: product.id })));
+      await ProductSize.bulkCreate(bodyValidation.value.sizes.map((s) => ({ size: s, product_id: product.id })));
     }
 
     // Handle variants
-    if (req.body.variants) {
+    if (bodyValidation.value.variants) {
       await ProductVariant.destroy({ where: { product_id: product.id } });
-      await ProductVariant.bulkCreate(req.body.variants.map(v => ({ ...v, product_id: product.id })));
+      await ProductVariant.bulkCreate(bodyValidation.value.variants.map((v) => ({ ...v, product_id: product.id })));
       await syncProductStockFromVariants(product.id);
     }
 
@@ -221,7 +282,9 @@ exports.updateProduct = async (req, res, next) => {
 
 exports.deleteProduct = async (req, res, next) => {
   try {
-    const product = await Product.findByPk(req.params.id);
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const product = await Product.findByPk(paramValidation.value.id);
     if (!product) return res.status(404).json({ error: 'Product not found' });
     await product.destroy();
     res.json({ message: 'Product deleted' });
@@ -233,10 +296,12 @@ exports.deleteProduct = async (req, res, next) => {
 // ---------- Flash Sales ----------
 exports.createFlashSale = async (req, res, next) => {
   try {
-    const { name, description, start_time, end_time, products } = req.body;
+    const { error, value } = validateBody(flashSaleCreateSchema, req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+    const { name, description, start_time, end_time, products } = value;
     const flashSale = await FlashSale.create({ name, description, start_time, end_time });
     if (products && products.length) {
-      const productLinks = products.map(p => ({
+      const productLinks = products.map((p) => ({
         flash_sale_id: flashSale.id,
         product_id: p.product_id,
         discount_price: p.discount_price,
@@ -262,13 +327,17 @@ exports.getFlashSales = async (req, res, next) => {
 
 exports.updateFlashSale = async (req, res, next) => {
   try {
-    const flashSale = await FlashSale.findByPk(req.params.id);
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const bodyValidation = validateBody(flashSaleUpdateSchema, req.body);
+    if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
+    const flashSale = await FlashSale.findByPk(paramValidation.value.id);
     if (!flashSale) return res.status(404).json({ error: 'Flash sale not found' });
-    await flashSale.update(req.body);
+    await flashSale.update(bodyValidation.value);
 
-    if (req.body.products) {
+    if (bodyValidation.value.products) {
       await FlashSaleProduct.destroy({ where: { flash_sale_id: flashSale.id } });
-      const productLinks = req.body.products.map(p => ({
+      const productLinks = bodyValidation.value.products.map((p) => ({
         flash_sale_id: flashSale.id,
         product_id: p.product_id,
         discount_price: p.discount_price,
@@ -284,7 +353,9 @@ exports.updateFlashSale = async (req, res, next) => {
 
 exports.deleteFlashSale = async (req, res, next) => {
   try {
-    const flashSale = await FlashSale.findByPk(req.params.id);
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const flashSale = await FlashSale.findByPk(paramValidation.value.id);
     if (!flashSale) return res.status(404).json({ error: 'Flash sale not found' });
     await flashSale.destroy();
     res.json({ message: 'Flash sale deleted' });
@@ -296,7 +367,9 @@ exports.deleteFlashSale = async (req, res, next) => {
 // ---------- Coupons ----------
 exports.createCoupon = async (req, res, next) => {
   try {
-    const coupon = await Coupon.create(req.body);
+    const { error, value } = validateBody(couponCreateSchema, req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+    const coupon = await Coupon.create(value);
     res.status(201).json(coupon);
   } catch (err) {
     next(err);
@@ -314,9 +387,13 @@ exports.getCoupons = async (req, res, next) => {
 
 exports.updateCoupon = async (req, res, next) => {
   try {
-    const coupon = await Coupon.findByPk(req.params.id);
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const bodyValidation = validateBody(couponUpdateSchema, req.body);
+    if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
+    const coupon = await Coupon.findByPk(paramValidation.value.id);
     if (!coupon) return res.status(404).json({ error: 'Coupon not found' });
-    await coupon.update(req.body);
+    await coupon.update(bodyValidation.value);
     res.json(coupon);
   } catch (err) {
     next(err);
@@ -325,7 +402,9 @@ exports.updateCoupon = async (req, res, next) => {
 
 exports.deleteCoupon = async (req, res, next) => {
   try {
-    const coupon = await Coupon.findByPk(req.params.id);
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const coupon = await Coupon.findByPk(paramValidation.value.id);
     if (!coupon) return res.status(404).json({ error: 'Coupon not found' });
     await coupon.destroy();
     res.json({ message: 'Coupon deleted' });
@@ -346,8 +425,12 @@ exports.getContactMessages = async (req, res, next) => {
 
 exports.replyToContactMessage = async (req, res, next) => {
   try {
-    const { reply } = req.body;
-    const message = await ContactMessage.findByPk(req.params.id);
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const bodyValidation = validateBody(contactReplySchema, req.body);
+    if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
+    const { reply } = bodyValidation.value;
+    const message = await ContactMessage.findByPk(paramValidation.value.id);
     if (!message) return res.status(404).json({ error: 'Message not found' });
 
     message.admin_reply = reply;
@@ -479,7 +562,9 @@ exports.resolveOrderDispute = async (req, res, next) => {
 
 exports.getPaymentEvents = async (req, res, next) => {
   try {
-    const { event } = req.query;
+    const queryValidation = validateBody(paymentEventQuerySchema, req.query);
+    if (queryValidation.error) return res.status(400).json({ error: 'Invalid query parameters' });
+    const { event } = queryValidation.value;
     const where = {};
     if (event) {
       where.event = String(event);

@@ -14,6 +14,10 @@ const SupportMessage = sequelize.define('SupportMessage', {
     type: DataTypes.ENUM('user', 'admin', 'guest'),
     allowNull: false,
   },
+  sender_name: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   recipient_role: {
     type: DataTypes.ENUM('user', 'admin', 'guest'),
     allowNull: false,

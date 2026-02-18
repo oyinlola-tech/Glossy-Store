@@ -1,5 +1,15 @@
 const { Product, Category, ProductImage, ProductColor, ProductSize, ProductVariant, Rating, Comment, FlashSale, User, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const {
+  productIdParamSchema,
+  productQuerySchema,
+  ratingSchema,
+  commentSchema,
+} = require('../validations/productValidation');
+
+const validateParams = (schema, params) => schema.validate(params, { abortEarly: true, convert: true, stripUnknown: true });
+const validateQuery = (schema, query) => schema.validate(query, { abortEarly: true, convert: true, stripUnknown: true });
+const validateBody = (schema, body) => schema.validate(body, { abortEarly: true, stripUnknown: true });
 
 const formatPricing = (product) => {
   const currentPrice = Number(product.base_price);
@@ -22,20 +32,22 @@ const formatAvailability = (product) => ({
 
 exports.getProducts = async (req, res, next) => {
   try {
-    const { category, minPrice, maxPrice, rating, flashSale, newArrivals, page = 1, limit = 20 } = req.query;
+    const { error, value } = validateQuery(productQuerySchema, req.query);
+    if (error) return res.status(400).json({ error: 'Invalid query parameters' });
+    const { category, minPrice, maxPrice, rating, flashSale, newArrivals, page, limit } = value;
     const pageNumber = Number(page) || 1;
     const pageSize = Number(limit) || 20;
     const where = {};
     if (category) where.category_id = category;
-    if (minPrice) where.base_price = { [Op.gte]: minPrice };
-    if (maxPrice) where.base_price = { ...where.base_price, [Op.lte]: maxPrice };
+    if (minPrice !== undefined) where.base_price = { [Op.gte]: minPrice };
+    if (maxPrice !== undefined) where.base_price = { ...where.base_price, [Op.lte]: maxPrice };
     if (rating) where.average_rating = { [Op.gte]: rating };
 
     const include = [
       { model: ProductImage },
       { model: ProductVariant, include: [{ model: ProductColor }, { model: ProductSize }] },
     ];
-    if (flashSale === 'true') {
+    if (flashSale === true) {
       include.push({
         model: FlashSale,
         where: {
@@ -45,7 +57,7 @@ exports.getProducts = async (req, res, next) => {
         required: true,
       });
     }
-    if (newArrivals === 'true') {
+    if (newArrivals === true) {
       where.created_at = { [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
     }
 
@@ -74,7 +86,9 @@ exports.getProducts = async (req, res, next) => {
 
 exports.getProduct = async (req, res, next) => {
   try {
-    const product = await Product.findByPk(req.params.id, {
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const product = await Product.findByPk(paramValidation.value.id, {
       include: [
         { model: ProductImage },
         { model: ProductColor },
@@ -97,9 +111,15 @@ exports.getProduct = async (req, res, next) => {
 
 exports.addRating = async (req, res, next) => {
   try {
-    const { rating, review } = req.body;
-    const productId = req.params.id;
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const bodyValidation = validateBody(ratingSchema, req.body);
+    if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
+    const { rating, review } = bodyValidation.value;
+    const productId = paramValidation.value.id;
     const userId = req.user.id;
+    const product = await Product.findByPk(productId);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
 
     const [ratingRecord, created] = await Rating.findOrCreate({
       where: { user_id: userId, product_id: productId },
@@ -126,9 +146,15 @@ exports.addRating = async (req, res, next) => {
 
 exports.addComment = async (req, res, next) => {
   try {
-    const { comment } = req.body;
-    const productId = req.params.id;
+    const paramValidation = validateParams(productIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const bodyValidation = validateBody(commentSchema, req.body);
+    if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
+    const { comment } = bodyValidation.value;
+    const productId = paramValidation.value.id;
     const userId = req.user.id;
+    const product = await Product.findByPk(productId);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
 
     const newComment = await Comment.create({
       user_id: userId,

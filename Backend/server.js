@@ -5,7 +5,8 @@ const { app, initializeDatabase } = require('./src/app');
 const { setupSupportSocket } = require('./src/socket/supportSocket');
 const { validateEnvironment } = require('./src/config/envValidation');
 
-const PORT = process.env.PORT || 5000;
+const DEFAULT_PORT = Number(process.env.PORT || 5000);
+const MAX_PORT_RETRIES = Number(process.env.PORT_RETRY_COUNT || 20);
 const allowedSocketOrigins = (process.env.SOCKET_CORS_ORIGIN || process.env.CORS_ALLOWED_ORIGINS || '')
   .split(',')
   .map((value) => value.trim())
@@ -18,6 +19,26 @@ const socketCorsOrigin = (origin, callback) => {
   if (allowedSocketOrigins.includes(origin)) return callback(null, true);
   return callback(new Error('Origin not allowed'));
 };
+
+const startListeningWithRetry = (server, preferredPort, retries) => new Promise((resolve, reject) => {
+  const tryListen = (port, remainingRetries) => {
+    const onError = (error) => {
+      if (error?.code === 'EADDRINUSE' && remainingRetries > 0) {
+        server.removeListener('error', onError);
+        return tryListen(port + 1, remainingRetries - 1);
+      }
+      return reject(error);
+    };
+
+    server.once('error', onError);
+    server.listen(port, () => {
+      server.removeListener('error', onError);
+      resolve(port);
+    });
+  };
+
+  tryListen(preferredPort, retries);
+});
 
 const startServer = async () => {
   let server;
@@ -41,9 +62,8 @@ const startServer = async () => {
     app.set('io', io);
     setupSupportSocket(io);
 
-    server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
+    const activePort = await startListeningWithRetry(server, DEFAULT_PORT, MAX_PORT_RETRIES);
+    console.log(`Server running on port ${activePort}`);
 
     const gracefulShutdown = (signal) => {
       console.log(`Received ${signal}. Shutting down gracefully...`);

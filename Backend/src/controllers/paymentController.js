@@ -46,15 +46,18 @@ const extractSavedCardPayload = (payload) => {
 
 exports.webhook = async (req, res) => {
   try {
-    const squadSecret = process.env.SQUAD_SECRET_KEY;
-    if (!squadSecret && process.env.NODE_ENV === 'production') {
+    const webhookSecret = process.env.SQUAD_WEBHOOK_SECRET || process.env.SQUAD_SECRET_KEY;
+    if (!webhookSecret && process.env.NODE_ENV === 'production') {
       return res.status(503).json({ error: 'Webhook service is unavailable' });
     }
 
-    if (squadSecret) {
+    if (webhookSecret) {
       const signature = req.headers['x-squad-signature'] || '';
+      if (!/^[a-f0-9]+$/i.test(String(signature))) {
+        return res.status(401).json({ error: 'Invalid webhook signature' });
+      }
       const expected = crypto
-        .createHmac('sha512', squadSecret)
+        .createHmac('sha512', webhookSecret)
         .update(req.rawBody || JSON.stringify(req.body))
         .digest('hex');
       if (!safeEqualHex(expected, signature)) {

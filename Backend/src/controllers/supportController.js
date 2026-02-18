@@ -176,7 +176,7 @@ exports.getGuestConversationMessages = async (req, res, next) => {
 
     const messages = await SupportMessage.findAll({
       where: { support_conversation_id: conversation.id },
-      include: [SupportMessageAttachment],
+      include: [{ model: User, attributes: ['id', 'name', 'email', 'role'] }, SupportMessageAttachment],
       order: [['created_at', 'ASC']],
     });
 

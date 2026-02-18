@@ -11,7 +11,9 @@ const BLOCKED_OBJECT_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
 const sanitizeString = (value, shouldTrim = true) => {
   const noNullBytes = String(value).replace(/\u0000/g, '');
-  return shouldTrim ? noNullBytes.trim() : noNullBytes;
+  const strippedScripts = noNullBytes.replace(/<\s*\/?\s*script\b[^>]*>/gi, '');
+  const strippedJsUrls = strippedScripts.replace(/\bjavascript:/gi, '');
+  return shouldTrim ? strippedJsUrls.trim() : strippedJsUrls;
 };
 
 const sanitizeValue = (value, key = '') => {

@@ -1,4 +1,12 @@
 const { Cart, CartItem, ProductVariant, Product, ProductImage, ProductColor, ProductSize } = require('../models');
+const {
+  cartItemIdParamSchema,
+  addToCartSchema,
+  updateCartItemSchema,
+} = require('../validations/cartValidation');
+
+const validateBody = (schema, body) => schema.validate(body, { abortEarly: true, stripUnknown: true });
+const validateParams = (schema, params) => schema.validate(params, { abortEarly: true, convert: true, stripUnknown: true });
 
 exports.getCart = async (req, res, next) => {
   try {
@@ -27,11 +35,10 @@ exports.getCart = async (req, res, next) => {
 
 exports.addToCart = async (req, res, next) => {
   try {
-    const { productVariantId, quantity = 1 } = req.body;
+    const { error, value } = validateBody(addToCartSchema, req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+    const { productVariantId, quantity } = value;
     const parsedQuantity = Number(quantity);
-    if (!Number.isInteger(parsedQuantity) || parsedQuantity < 1) {
-      return res.status(400).json({ error: 'quantity must be a positive integer' });
-    }
     let cart = await Cart.findOne({ where: { user_id: req.user.id } });
     if (!cart) {
       cart = await Cart.create({ user_id: req.user.id });
@@ -67,12 +74,13 @@ exports.addToCart = async (req, res, next) => {
 
 exports.updateCartItem = async (req, res, next) => {
   try {
-    const { quantity } = req.body;
-    if (!Number.isInteger(Number(quantity)) || Number(quantity) < 1) {
-      return res.status(400).json({ error: 'quantity must be a positive integer' });
-    }
+    const paramValidation = validateParams(cartItemIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
+    const bodyValidation = validateBody(updateCartItemSchema, req.body);
+    if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
+    const { quantity } = bodyValidation.value;
     const cartItem = await CartItem.findOne({
-      where: { id: req.params.itemId },
+      where: { id: paramValidation.value.itemId },
       include: [{ model: Cart, where: { user_id: req.user.id } }],
     });
     if (!cartItem) return res.status(404).json({ error: 'Item not found' });
@@ -93,8 +101,10 @@ exports.updateCartItem = async (req, res, next) => {
 
 exports.removeFromCart = async (req, res, next) => {
   try {
+    const paramValidation = validateParams(cartItemIdParamSchema, req.params);
+    if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
     const cartItem = await CartItem.findOne({
-      where: { id: req.params.itemId },
+      where: { id: paramValidation.value.itemId },
       include: [{ model: Cart, where: { user_id: req.user.id } }],
     });
     if (!cartItem) return res.status(404).json({ error: 'Item not found' });

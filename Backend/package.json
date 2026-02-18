@@ -4,8 +4,10 @@
   "description": "E-commerce backend for Glossy Store",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "npm run start --prefix ..",
+    "dev": "npm run dev --prefix ..",
+    "start:backend-only": "node server.js",
+    "dev:backend-only": "nodemon server.js",
     "db:create": "node scripts/createDatabase.js",
     "db:migrate": "node scripts/runAdminMigrations.js",
     "db:migrate:admin": "node scripts/runAdminMigrations.js",
@@ -22,13 +24,13 @@
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
-    "mysql2": "^3.17.1",
+    "mysql2": "^3.17.2",
     "nodemailer": "^8.0.1",
     "passport": "^0.7.0",
     "passport-apple": "^2.0.2",
     "passport-google-oauth20": "^2.0.0",
     "sequelize": "^6.37.7",
-    "socket.io": "^4.8.1",
+    "socket.io": "^4.8.3",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
