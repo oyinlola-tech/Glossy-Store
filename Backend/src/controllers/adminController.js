@@ -3,6 +3,7 @@ const {
   FlashSale, FlashSaleProduct, Coupon, ContactMessage, User, Order, OrderItem,
   PaystackEvent, sequelize,
 } = require('../models');
+const { Op } = require('sequelize');
 const { sendContactReplyEmail } = require('../services/emailService');
 const {
   orderIdParamSchema,
@@ -27,9 +28,15 @@ const {
   productIdParamSchema,
 } = require('../validations/productValidation');
 const { idParamSchema } = require('../validations/commonValidation');
+const {
+  financeSummaryQuerySchema,
+  financeTrendsQuerySchema,
+  financeTransactionsQuerySchema,
+} = require('../validations/financeValidation');
 
 const validateBody = (schema, body) => schema.validate(body, { abortEarly: true, stripUnknown: true });
 const validateParams = (schema, params) => schema.validate(params, { abortEarly: true, convert: true, stripUnknown: true });
+const validateQuery = (schema, query) => schema.validate(query, { abortEarly: true, convert: true, stripUnknown: true });
 
 const syncProductStockFromVariants = async (productId, transaction = undefined) => {
   const variants = await ProductVariant.findAll({
@@ -40,6 +47,21 @@ const syncProductStockFromVariants = async (productId, transaction = undefined) 
   if (!variants.length) return;
   const totalStock = variants.reduce((sum, variant) => sum + Number(variant.stock || 0), 0);
   await Product.update({ stock: totalStock }, { where: { id: productId }, transaction });
+};
+
+const normalizeDateRange = (start, end) => {
+  let startDate = start ? new Date(start) : null;
+  let endDate = end ? new Date(end) : null;
+  if (startDate && Number.isNaN(startDate.getTime())) startDate = null;
+  if (endDate && Number.isNaN(endDate.getTime())) endDate = null;
+  if (startDate) startDate.setHours(0, 0, 0, 0);
+  if (endDate) endDate.setHours(23, 59, 59, 999);
+  return { startDate, endDate };
+};
+
+const toNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 };
 
 // ---------- Admin Users ----------
@@ -224,6 +246,9 @@ exports.createProduct = async (req, res, next) => {
     if (!category) {
       return res.status(400).json({ error: 'Category not found' });
     }
+    if (!category.parent_id) {
+      return res.status(400).json({ error: 'Products must be assigned to a subcategory' });
+    }
 
     const product = await sequelize.transaction(async (transaction) => {
       const created = await Product.create({
@@ -279,6 +304,9 @@ exports.updateProduct = async (req, res, next) => {
       const category = await Category.findByPk(bodyValidation.value.category_id);
       if (!category) {
         return res.status(400).json({ error: 'Category not found' });
+      }
+      if (!category.parent_id) {
+        return res.status(400).json({ error: 'Products must be assigned to a subcategory' });
       }
     }
 
@@ -622,6 +650,167 @@ exports.getPaymentEvents = async (req, res, next) => {
       limit: 200,
     });
     return res.json(events);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+exports.getFinancialSummary = async (req, res, next) => {
+  try {
+    const queryValidation = validateQuery(financeSummaryQuerySchema, req.query);
+    if (queryValidation.error) return res.status(400).json({ error: 'Invalid query parameters' });
+    const { start, end } = queryValidation.value;
+    const { startDate, endDate } = normalizeDateRange(start, end);
+
+    const dateWhere = {};
+    if (startDate && endDate) {
+      dateWhere.created_at = { [Op.between]: [startDate, endDate] };
+    } else if (startDate) {
+      dateWhere.created_at = { [Op.gte]: startDate };
+    } else if (endDate) {
+      dateWhere.created_at = { [Op.lte]: endDate };
+    }
+
+    const [summary] = await Order.findAll({
+      attributes: [
+        [sequelize.literal("SUM(CASE WHEN payment_status = 'success' THEN total ELSE 0 END)"), 'gross_sales'],
+        [sequelize.literal("SUM(CASE WHEN status = 'refunded' THEN total ELSE 0 END)"), 'refund_total'],
+        [sequelize.literal("SUM(CASE WHEN payment_status = 'success' THEN 1 ELSE 0 END)"), 'orders'],
+        [sequelize.literal("SUM(CASE WHEN status = 'refunded' THEN 1 ELSE 0 END)"), 'refunds'],
+        [sequelize.literal("SUM(CASE WHEN payment_status = 'success' THEN discount ELSE 0 END)"), 'discounts'],
+      ],
+      where: dateWhere,
+      raw: true,
+    });
+
+    const gross_sales = toNumber(summary?.gross_sales);
+    const refund_total = toNumber(summary?.refund_total);
+    const orders = toNumber(summary?.orders);
+    const refunds = toNumber(summary?.refunds);
+    const discounts = toNumber(summary?.discounts);
+    const net_revenue = Math.max(0, gross_sales - refund_total);
+    const avg_order_value = orders > 0 ? gross_sales / orders : 0;
+
+    return res.json({
+      gross_sales,
+      refund_total,
+      net_revenue,
+      orders,
+      refunds,
+      discounts,
+      avg_order_value,
+      start: startDate ? startDate.toISOString() : null,
+      end: endDate ? endDate.toISOString() : null,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+exports.getFinancialTrends = async (req, res, next) => {
+  try {
+    const queryValidation = validateQuery(financeTrendsQuerySchema, req.query);
+    if (queryValidation.error) return res.status(400).json({ error: 'Invalid query parameters' });
+    const { period, start, end } = queryValidation.value;
+    const { startDate, endDate } = normalizeDateRange(start, end);
+
+    const dateWhere = {};
+    if (startDate && endDate) {
+      dateWhere.created_at = { [Op.between]: [startDate, endDate] };
+    } else if (startDate) {
+      dateWhere.created_at = { [Op.gte]: startDate };
+    } else if (endDate) {
+      dateWhere.created_at = { [Op.lte]: endDate };
+    }
+
+    let periodExpr;
+    let orderExpr;
+    if (period === 'weekly') {
+      periodExpr = sequelize.literal("YEARWEEK(created_at, 1)");
+      orderExpr = sequelize.literal("YEARWEEK(created_at, 1)");
+    } else if (period === 'monthly') {
+      periodExpr = sequelize.literal("DATE_FORMAT(created_at, '%Y-%m')");
+      orderExpr = sequelize.literal("DATE_FORMAT(created_at, '%Y-%m')");
+    } else if (period === 'yearly') {
+      periodExpr = sequelize.literal('YEAR(created_at)');
+      orderExpr = sequelize.literal('YEAR(created_at)');
+    } else {
+      periodExpr = sequelize.literal('DATE(created_at)');
+      orderExpr = sequelize.literal('DATE(created_at)');
+    }
+
+    const rows = await Order.findAll({
+      attributes: [
+        [periodExpr, 'period'],
+        [sequelize.literal("SUM(CASE WHEN payment_status = 'success' THEN total ELSE 0 END)"), 'gross_sales'],
+        [sequelize.literal("SUM(CASE WHEN status = 'refunded' THEN total ELSE 0 END)"), 'refund_total'],
+        [sequelize.literal("SUM(CASE WHEN payment_status = 'success' THEN 1 ELSE 0 END)"), 'orders'],
+      ],
+      where: dateWhere,
+      group: ['period'],
+      order: [[orderExpr, 'ASC']],
+      raw: true,
+    });
+
+    const trends = rows.map((row) => {
+      const gross_sales = toNumber(row.gross_sales);
+      const refund_total = toNumber(row.refund_total);
+      return {
+        period: String(row.period),
+        gross_sales,
+        refund_total,
+        net_revenue: Math.max(0, gross_sales - refund_total),
+        orders: toNumber(row.orders),
+      };
+    });
+
+    return res.json({
+      period,
+      start: startDate ? startDate.toISOString() : null,
+      end: endDate ? endDate.toISOString() : null,
+      trends,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+exports.getFinancialTransactions = async (req, res, next) => {
+  try {
+    const queryValidation = validateQuery(financeTransactionsQuerySchema, req.query);
+    if (queryValidation.error) return res.status(400).json({ error: 'Invalid query parameters' });
+    const { type, start, end, limit, offset } = queryValidation.value;
+    const { startDate, endDate } = normalizeDateRange(start, end);
+
+    const where = {};
+    if (startDate && endDate) {
+      where.created_at = { [Op.between]: [startDate, endDate] };
+    } else if (startDate) {
+      where.created_at = { [Op.gte]: startDate };
+    } else if (endDate) {
+      where.created_at = { [Op.lte]: endDate };
+    }
+
+    if (type === 'sales') {
+      where.payment_status = 'success';
+    } else if (type === 'refunds') {
+      where.status = 'refunded';
+    }
+
+    const { rows, count } = await Order.findAndCountAll({
+      where,
+      include: [{ model: User, attributes: ['id', 'name', 'email'] }],
+      order: [['created_at', 'DESC']],
+      limit,
+      offset,
+    });
+
+    return res.json({
+      total: count,
+      limit,
+      offset,
+      transactions: rows,
+    });
   } catch (err) {
     return next(err);
   }

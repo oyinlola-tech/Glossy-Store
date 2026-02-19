@@ -9,6 +9,7 @@ export function ProductDetailPage() {
   const { id } = useParams();
   const [product, setProduct] = useState<api.Product | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [comment, setComment] = useState('');
   const [rating, setRating] = useState(5);
@@ -24,6 +25,7 @@ export function ProductDetailPage() {
         setProduct(data);
         const firstAvailable = data.ProductVariants?.find((variant) => Number(variant.stock) > 0);
         setSelectedVariantId(firstAvailable?.id || data.ProductVariants?.[0]?.id || null);
+        setSelectedImageIndex(0);
       } catch (error: any) {
         toast.error(error.message || 'Unable to load product');
       } finally {
@@ -40,7 +42,9 @@ export function ProductDetailPage() {
 
   const currentPrice = Number(product?.current_price ?? product?.base_price ?? 0);
   const originalPrice = Number(product?.original_price || 0);
-  const image = product?.ProductImages?.[0]?.image_url || `https://source.unsplash.com/600x600/?product,${encodeURIComponent(product?.name || 'item')}`;
+  const productImages = product?.ProductImages || [];
+  const fallbackImage = `https://source.unsplash.com/600x600/?product,${encodeURIComponent(product?.name || 'item')}`;
+  const image = productImages[selectedImageIndex]?.image_url || productImages[0]?.image_url || fallbackImage;
 
   const addToCart = async () => {
     if (!user) {
@@ -102,8 +106,37 @@ export function ProductDetailPage() {
     <div className="min-h-screen bg-white dark:bg-gray-900 py-10">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden">
-            <img src={image} alt={product.name} className="w-full h-full object-cover min-h-[380px]" />
+          <div className="space-y-4">
+            <div className="bg-gradient-to-br from-[#f7f2e8] via-white to-[#efe7d8] dark:from-[#171412] dark:via-[#1c1917] dark:to-[#141210] rounded-2xl p-3 shadow-[0_30px_80px_rgba(15,12,8,0.18)]">
+              <div className="relative h-[420px] overflow-hidden rounded-xl border border-[#e3d7c5] dark:border-[#3b332c] bg-white/70 dark:bg-black/40">
+                <div className="absolute inset-0 border border-[#bfa06a]/30 pointer-events-none" />
+                <img src={image} alt={product.name} className="w-full h-full object-cover" />
+              </div>
+            </div>
+            {productImages.length > 1 ? (
+              <div className="flex items-center gap-3 overflow-x-auto pb-1">
+                {productImages.map((photo, index) => (
+                  <button
+                    key={`${photo.image_url}-${index}`}
+                    type="button"
+                    onClick={() => setSelectedImageIndex(index)}
+                    className={`relative h-20 w-20 shrink-0 rounded-xl border ${
+                      selectedImageIndex === index
+                        ? 'border-[#bfa06a] shadow-[0_10px_25px_rgba(191,160,106,0.35)]'
+                        : 'border-[#e4d9c7] dark:border-[#2c2622]'
+                    } bg-white/80 dark:bg-black/30`}
+                    aria-label={`View image ${index + 1}`}
+                  >
+                    <div className="absolute inset-0 rounded-xl ring-1 ring-[#bfa06a]/20 pointer-events-none" />
+                    <img
+                      src={photo.image_url || fallbackImage}
+                      alt={`${product.name} ${index + 1}`}
+                      className="h-full w-full rounded-xl object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
           <div>
             <h1 className="text-3xl font-bold text-black dark:text-white mb-4">{product.name}</h1>

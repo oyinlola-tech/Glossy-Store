@@ -33,9 +33,6 @@
     "socket.io": "^4.8.3",
     "swagger-ui-express": "^5.0.1"
   },
-  "devDependencies": {
-    "nodemon": "^3.1.11"
-  },
   "overrides": {
     "minimatch": "^10.2.1"
   }

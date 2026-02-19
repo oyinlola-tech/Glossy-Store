@@ -167,12 +167,26 @@ export function SupportChatWidget() {
     window.localStorage.setItem(guestSessionKey, JSON.stringify({ id, token, name, email }));
   };
 
+  const clearGuestSession = () => {
+    setGuestConversationId(null);
+    setGuestToken(null);
+    setGuestMessages([]);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(guestSessionKey);
+    }
+  };
+
   const loadGuestMessages = async (conversationId: number, token: string) => {
     setLoading(true);
     try {
       const payload = await api.getGuestSupportMessages(conversationId, token) as { messages: SupportMessage[] };
       setGuestMessages(Array.isArray(payload?.messages) ? payload.messages : []);
     } catch (error: any) {
+      const message = String(error?.message || '');
+      if (message.includes('401') || message.includes('403') || message.includes('404') || message.toLowerCase().includes('not found')) {
+        clearGuestSession();
+        return;
+      }
       toast.error(error.message || 'Failed to load support messages');
     } finally {
       setLoading(false);
@@ -498,14 +512,11 @@ export function SupportChatWidget() {
     clearAttachments();
     setSubject('Support Request');
 
-    if (isGuest) {
-      const normalizedEmail = guestEmail.trim().toLowerCase();
-      const canCreateGuestTicket = guestName.trim() && /\S+@\S+\.\S+/.test(normalizedEmail);
-      if (!canCreateGuestTicket) {
-        setGuestConversationId(null);
-        setGuestToken(null);
-        setGuestMessages([]);
-        if (typeof window !== 'undefined') window.localStorage.removeItem(guestSessionKey);
+      if (isGuest) {
+        const normalizedEmail = guestEmail.trim().toLowerCase();
+        const canCreateGuestTicket = guestName.trim() && /\S+@\S+\.\S+/.test(normalizedEmail);
+        if (!canCreateGuestTicket) {
+        clearGuestSession();
         if (isMobile) setMobileView('chat');
         return;
       }

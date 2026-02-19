@@ -26,6 +26,7 @@ import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage';
 import { SuperAdminAdminsPage } from './pages/superadmin/SuperAdminAdminsPage';
 import { SuperAdminDashboard } from './pages/superadmin/SuperAdminDashboard';
+import { SuperAdminFinancePage } from './pages/superadmin/SuperAdminFinancePage';
 import { SuperAdminSettingsPage } from './pages/superadmin/SuperAdminSettingsPage';
 import { SuperAdminUsersPage } from './pages/superadmin/SuperAdminUsersPage';
 
@@ -209,6 +210,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['superadmin']}>
             <MainLayout><SuperAdminAdminsPage /></MainLayout>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'superadmin/finance',
+        element: (
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            <MainLayout><SuperAdminFinancePage /></MainLayout>
           </ProtectedRoute>
         ),
       },

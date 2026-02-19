@@ -53,4 +53,9 @@ router.patch('/orders/:id/dispute', sensitiveActionRateLimiter, adminController.
 // Payments
 router.get('/payments/events', adminController.getPaymentEvents);
 
+// Finance (super admin only)
+router.get('/finance/summary', superAdminMiddleware, adminController.getFinancialSummary);
+router.get('/finance/trends', superAdminMiddleware, adminController.getFinancialTrends);
+router.get('/finance/transactions', superAdminMiddleware, adminController.getFinancialTransactions);
+
 module.exports = router;

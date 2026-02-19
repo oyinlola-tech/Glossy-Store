@@ -42,9 +42,16 @@ const normalizeTableName = (entry) => {
   return '';
 };
 
+const isDevLocalhost = (origin) => {
+  if (!origin) return false;
+  return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+};
+
 const corsOrigin = (origin, callback) => {
   if (!origin) return callback(null, true);
-  if (!isProduction && allowedOrigins.length === 0) return callback(null, true);
+  if (!isProduction && (allowedOrigins.length === 0 || isDevLocalhost(origin))) {
+    return callback(null, true);
+  }
   if (allowedOrigins.includes(origin)) return callback(null, true);
   return callback(new Error('Origin not allowed by CORS'));
 };

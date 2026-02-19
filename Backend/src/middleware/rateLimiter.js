@@ -33,7 +33,8 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => (
-    req.method === 'OPTIONS'
+    process.env.NODE_ENV !== 'production'
+    || req.method === 'OPTIONS'
     || req.path === '/api/health'
     || req.path === '/api/info'
     || req.path === '/health'

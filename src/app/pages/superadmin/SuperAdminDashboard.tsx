@@ -111,6 +111,15 @@ export function SuperAdminDashboard() {
           </Link>
 
           <Link
+            to="/superadmin/finance"
+            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
+          >
+            <Activity className="size-12 text-red-500 mb-4" />
+            <h3 className="text-xl font-semibold text-black dark:text-white mb-2">Financial Reports</h3>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">Sales, refunds, and growth trends</p>
+          </Link>
+
+          <Link
             to="/admin/products"
             className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
           >
@@ -120,12 +129,30 @@ export function SuperAdminDashboard() {
           </Link>
 
           <Link
+            to="/admin/categories"
+            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
+          >
+            <Database className="size-12 text-red-500 mb-4" />
+            <h3 className="text-xl font-semibold text-black dark:text-white mb-2">Categories</h3>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">Create categories and subcategories</p>
+          </Link>
+
+          <Link
             to="/admin/orders"
             className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
           >
             <Activity className="size-12 text-red-500 mb-4" />
             <h3 className="text-xl font-semibold text-black dark:text-white mb-2">Orders</h3>
             <p className="text-gray-600 dark:text-gray-400 text-sm">View all orders</p>
+          </Link>
+
+          <Link
+            to="/admin/payments"
+            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
+          >
+            <Activity className="size-12 text-red-500 mb-4" />
+            <h3 className="text-xl font-semibold text-black dark:text-white mb-2">Transactions</h3>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">Payment events and receipts</p>
           </Link>
         </div>
       </div>

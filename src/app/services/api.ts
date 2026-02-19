@@ -245,6 +245,45 @@ export type CouponValidationResponse = {
   };
 };
 
+export type FinanceSummary = {
+  gross_sales: number;
+  refund_total: number;
+  net_revenue: number;
+  orders: number;
+  refunds: number;
+  discounts: number;
+  avg_order_value: number;
+  start: string | null;
+  end: string | null;
+};
+
+export type FinanceTrendPoint = {
+  period: string;
+  gross_sales: number;
+  refund_total: number;
+  net_revenue: number;
+  orders: number;
+};
+
+export type FinanceTrendsResponse = {
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  start: string | null;
+  end: string | null;
+  trends: FinanceTrendPoint[];
+};
+
+export type FinanceTransaction = {
+  id: number;
+  order_number: string;
+  total: number;
+  discount: number;
+  status: string;
+  payment_status: string;
+  created_at: string;
+  refunded_at?: string | null;
+  User?: { id: number; name: string; email: string };
+};
+
 const toNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -545,6 +584,31 @@ export const resolveOrderDispute = (id: number | string, decision: 'approve_char
 export const getAdminUsers = () => apiCall('/admin/users', { requireAuth: true });
 export const getPaymentEvents = (event?: string) =>
   apiCall(`/admin/payments/events${event ? `?event=${encodeURIComponent(event)}` : ''}`, { requireAuth: true });
+export const getFinanceSummary = (params?: { start?: string; end?: string }) => {
+  const search = new URLSearchParams();
+  if (params?.start) search.set('start', params.start);
+  if (params?.end) search.set('end', params.end);
+  return apiCall<FinanceSummary>(`/admin/finance/summary${search.toString() ? `?${search.toString()}` : ''}`, { requireAuth: true });
+};
+export const getFinanceTrends = (params?: { period?: 'daily' | 'weekly' | 'monthly' | 'yearly'; start?: string; end?: string }) => {
+  const search = new URLSearchParams();
+  if (params?.period) search.set('period', params.period);
+  if (params?.start) search.set('start', params.start);
+  if (params?.end) search.set('end', params.end);
+  return apiCall<FinanceTrendsResponse>(`/admin/finance/trends${search.toString() ? `?${search.toString()}` : ''}`, { requireAuth: true });
+};
+export const getFinanceTransactions = (params?: { type?: 'all' | 'sales' | 'refunds'; start?: string; end?: string; limit?: number; offset?: number }) => {
+  const search = new URLSearchParams();
+  if (params?.type) search.set('type', params.type);
+  if (params?.start) search.set('start', params.start);
+  if (params?.end) search.set('end', params.end);
+  if (params?.limit) search.set('limit', String(params.limit));
+  if (params?.offset) search.set('offset', String(params.offset));
+  return apiCall<{ total: number; limit: number; offset: number; transactions: FinanceTransaction[] }>(
+    `/admin/finance/transactions${search.toString() ? `?${search.toString()}` : ''}`,
+    { requireAuth: true }
+  );
+};
 export const createCategory = (data: { name: string; description?: string; parent_id?: number }) =>
   apiCall('/admin/categories', {
     method: 'POST',

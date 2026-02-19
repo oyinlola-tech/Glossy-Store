@@ -34,10 +34,20 @@ export function AdminProductsPage() {
     void load();
   }, []);
 
-  const parentCategories = useMemo(
-    () => categories.filter((category) => !category.parent_id),
-    [categories]
-  );
+  const categoryOptions = useMemo(() => {
+    const byId = new Map<number, api.Category>();
+    categories.forEach((category) => {
+      byId.set(category.id, category);
+    });
+    return categories
+      .filter((category) => Boolean(category.parent_id))
+      .map((category) => {
+        const parent = category.parent_id ? byId.get(category.parent_id) : undefined;
+        const label = parent ? `${parent.name} / ${category.name}` : category.name;
+        return { id: category.id, label };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [categories]);
 
   const createProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,12 +113,9 @@ export function AdminProductsPage() {
             required
             className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white"
           >
-            <option value="">Select category</option>
-            {parentCategories.map((category) => (
-              <option key={category.id} value={category.id}>{category.name}</option>
-            ))}
-            {categories.filter((c) => c.parent_id).map((category) => (
-              <option key={category.id} value={category.id}>{category.name}</option>
+            <option value="">Select subcategory</option>
+            {categoryOptions.map((category) => (
+              <option key={category.id} value={category.id}>{category.label}</option>
             ))}
           </select>
           <textarea
