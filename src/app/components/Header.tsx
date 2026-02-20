@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Heart, LogOut, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import * as api from '../services/api';
 import { ThemeToggle } from './ThemeToggle';
 
 export function Header() {
@@ -10,6 +11,7 @@ export function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -21,6 +23,56 @@ export function Header() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCartCount = async () => {
+      try {
+        if (user) {
+          const data = await api.getCart();
+          const items = Array.isArray(data?.CartItems) ? data.CartItems : [];
+          const total = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+          if (isMounted) setCartCount(total);
+          return;
+        }
+
+        const raw = localStorage.getItem('cart');
+        const parsed = raw ? (JSON.parse(raw) as { items?: any[] }) : { items: [] };
+        const items = Array.isArray(parsed.items) ? parsed.items : [];
+        const total = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+        if (isMounted) setCartCount(total);
+      } catch {
+        if (isMounted) setCartCount(0);
+      }
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'cart') {
+        void loadCartCount();
+      }
+    };
+
+    const handleCartUpdate = () => {
+      void loadCartCount();
+    };
+
+    const handleFocus = () => {
+      void loadCartCount();
+    };
+
+    void loadCartCount();
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('cart:updated', handleCartUpdate as EventListener);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('cart:updated', handleCartUpdate as EventListener);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [user]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,6 +151,11 @@ export function Header() {
             </Link>
             <Link to="/cart" className="relative hover:opacity-70">
               <ShoppingCart className="size-6 text-black dark:text-white" />
+              {cartCount > 0 ? (
+                <span className="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                  {cartCount > 99 ? '99+' : cartCount}
+                </span>
+              ) : null}
             </Link>
 
             {user ? (

@@ -45,6 +45,7 @@ export function WishlistPage() {
         await api.addToCart({ productVariantId: variant.id, quantity: 1 });
         toast.success('Added to cart');
         navigate('/cart');
+        window.dispatchEvent(new Event('cart:updated'));
         return;
       }
 
@@ -72,6 +73,7 @@ export function WishlistPage() {
       localStorage.setItem('cart', JSON.stringify({ items }));
       toast.success('Added to cart');
       navigate('/cart');
+      window.dispatchEvent(new Event('cart:updated'));
     } catch (error: any) {
       toast.error(error.message || 'Failed to add to cart');
     }

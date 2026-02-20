@@ -75,6 +75,7 @@ export function CartPage() {
       await api.updateCartItem(itemId, newQuantity);
       await loadCart();
       toast.success('Cart updated');
+      window.dispatchEvent(new Event('cart:updated'));
     } catch (error: any) {
       toast.error(error.message || 'Failed to update cart');
     }
@@ -91,6 +92,7 @@ export function CartPage() {
       await api.deleteCartItem(itemId);
       await loadCart();
       toast.success('Item removed from cart');
+      window.dispatchEvent(new Event('cart:updated'));
     } catch (error: any) {
       toast.error(error.message || 'Failed to remove item');
     }

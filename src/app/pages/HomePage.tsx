@@ -9,7 +9,7 @@ import { formatCurrency } from '../utils/currency';
 const toPrice = (product: api.Product) =>
   Number(product.current_price ?? product.base_price ?? 0);
 
-const addToLocalCart = (payload: {
+  const addToLocalCart = (payload: {
   id: number;
   productName: string;
   unitPrice: number;
@@ -29,6 +29,7 @@ const addToLocalCart = (payload: {
     items.push({ ...payload });
   }
   localStorage.setItem('cart', JSON.stringify({ items }));
+  window.dispatchEvent(new Event('cart:updated'));
 };
 
 const discountSticker = (product: api.Product) => {
@@ -123,6 +124,7 @@ export function HomePage() {
           : { productId: product.id, quantity: 1 }
       );
       toast.success('Added to cart');
+      window.dispatchEvent(new Event('cart:updated'));
     } catch (error: any) {
       toast.error(error.message || 'Failed to add to cart');
     }

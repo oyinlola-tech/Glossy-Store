@@ -41,6 +41,7 @@ const addToLocalCart = (payload: {
     items.push({ ...payload });
   }
   localStorage.setItem('cart', JSON.stringify({ items }));
+  window.dispatchEvent(new Event('cart:updated'));
 };
 
 export function ProductsPage() {
@@ -183,6 +184,7 @@ export function ProductsPage() {
           : { productId: product.id, quantity: 1 }
       );
       toast.success('Added to cart');
+      window.dispatchEvent(new Event('cart:updated'));
     } catch (error: any) {
       toast.error(error.message || 'Failed to add to cart');
     }
