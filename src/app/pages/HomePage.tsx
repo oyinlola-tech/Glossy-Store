@@ -9,8 +9,42 @@ import { formatCurrency } from '../utils/currency';
 const toPrice = (product: api.Product) =>
   Number(product.current_price ?? product.base_price ?? 0);
 
+const addToLocalCart = (payload: {
+  id: number;
+  productName: string;
+  unitPrice: number;
+  quantity: number;
+  image?: string | null;
+  variantLabel?: string;
+  note?: string | null;
+}) => {
+  const raw = localStorage.getItem('cart');
+  const parsed = raw ? (JSON.parse(raw) as { items?: any[] }) : { items: [] };
+  const items = Array.isArray(parsed.items) ? parsed.items : [];
+  const existing = items.find((item) => Number(item.id) === Number(payload.id));
+  if (existing) {
+    existing.quantity = Number(existing.quantity || 1) + payload.quantity;
+    if (payload.note) existing.note = payload.note;
+  } else {
+    items.push({ ...payload });
+  }
+  localStorage.setItem('cart', JSON.stringify({ items }));
+};
+
+const discountSticker = (product: api.Product) => {
+  if (product.discount_label && String(product.discount_label).trim()) {
+    return String(product.discount_label).trim();
+  }
+  const current = Number(product.current_price ?? product.base_price ?? 0);
+  const original = Number(product.original_price || 0);
+  if (!original || current <= 0 || current >= original) return null;
+  const percent = Math.round(((original - current) / original) * 100);
+  return percent > 0 ? `-${percent}%` : null;
+};
+
 export function HomePage() {
   const [products, setProducts] = useState<api.Product[]>([]);
+  const [flashSaleProducts, setFlashSaleProducts] = useState<api.Product[]>([]);
   const [categories, setCategories] = useState<api.Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [trendingProducts, setTrendingProducts] = useState<api.Product[]>([]);
@@ -20,9 +54,17 @@ export function HomePage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const result = await api.getProducts({ limit: 12 });
-        const categoryResult = await api.getCategories({ tree: true });
+        const [result, flashResult, categoryResult] = await Promise.all([
+          api.getProducts({ limit: 12 }),
+          api.getProducts({ flashSale: true, limit: 8 }),
+          api.getCategories({ tree: true }),
+        ]);
         setProducts(result.products || []);
+        setFlashSaleProducts(
+          (flashResult.products || [])
+            .filter((product) => Number(product.current_price ?? product.base_price ?? 0) < Number(product.original_price || 0))
+            .slice(0, 8)
+        );
         setCategories(categoryResult.categories || []);
       } catch (error) {
         console.error('Error loading data:', error);
@@ -44,23 +86,42 @@ export function HomePage() {
     return () => window.clearInterval(interval);
   }, [products]);
 
-  const flashSaleProducts = useMemo(() => products.slice(0, 4), [products]);
   const topProducts = useMemo(() => products.slice(0, 8), [products]);
 
   const addProductToCart = async (product: api.Product) => {
-    if (!user) {
-      toast.error('Please login to add items to cart');
-      navigate('/login');
-      return;
-    }
     const variant = product.ProductVariants?.find((entry) => Number(entry.stock) > 0);
-    if (!variant) {
+    const hasProductStock = Number((product as any).stock || 0) > 0;
+    if (!variant && !hasProductStock) {
       toast.error('This product is currently out of stock');
       return;
     }
 
     try {
-      await api.addToCart({ productVariantId: variant.id, quantity: 1 });
+      if (!user) {
+        const unitPrice = variant
+          ? Number(product.base_price ?? 0) + Number(variant.price_adjustment || 0)
+          : toPrice(product);
+        const color = variant?.ProductColor?.name || variant?.ProductColor?.color_name;
+        const size = variant?.ProductSize?.size;
+        const variantLabel = [color, size].filter(Boolean).join(' / ');
+        addToLocalCart({
+          id: variant?.id || product.id,
+          productName: product.name,
+          unitPrice,
+          quantity: 1,
+          image: product.ProductImages?.[0]?.image_url || null,
+          variantLabel,
+          note: null,
+        });
+        toast.success('Added to cart');
+        return;
+      }
+
+      await api.addToCart(
+        variant
+          ? { productVariantId: variant.id, quantity: 1 }
+          : { productId: product.id, quantity: 1 }
+      );
       toast.success('Added to cart');
     } catch (error: any) {
       toast.error(error.message || 'Failed to add to cart');
@@ -107,10 +168,8 @@ export function HomePage() {
                       <img
                         src={product.ProductImages?.[0]?.image_url || `https://source.unsplash.com/200x200/?fashion,${encodeURIComponent(product.name)}`}
                         alt={product.name}
-                        className="h-20 w-full object-cover rounded mb-2"
+                        className="h-24 w-full object-cover rounded"
                       />
-                      <p className="text-xs font-semibold truncate">{product.name}</p>
-                      <p className="text-[11px] text-white/70">{formatCurrency(toPrice(product))}</p>
                     </div>
                   ))}
                 </div>
@@ -151,7 +210,7 @@ export function HomePage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {flashSaleProducts.map((product) => (
-            <ProductCard key={product.id} product={product} onAddToCart={addProductToCart} />
+            <FeaturedImageCard key={product.id} product={product} />
           ))}
         </div>
       </section>
@@ -180,15 +239,16 @@ export function HomePage() {
 function ProductCard({ product, onAddToCart }: { product: api.Product; onAddToCart: (product: api.Product) => void }) {
   const price = toPrice(product);
   const original = Number(product.original_price || 0);
+  const sticker = discountSticker(product);
   const image = product.ProductImages?.[0]?.image_url || `https://source.unsplash.com/400x400/?product,${encodeURIComponent(product.name)}`;
   const rating = Math.round(Number(product.average_rating || 0));
 
   return (
     <div className="group relative">
       <div className="aspect-square bg-gray-100 dark:bg-gray-800 rounded overflow-hidden mb-4 relative">
-        {original > price ? (
+        {sticker ? (
           <span className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
-            Sale
+            {sticker}
           </span>
         ) : null}
         <div className="absolute top-2 right-2 flex flex-col gap-2">
@@ -199,8 +259,10 @@ function ProductCard({ product, onAddToCart }: { product: api.Product; onAddToCa
             <Eye className="size-4" />
           </Link>
         </div>
-        <img src={image} alt={product.name} className="w-full h-full object-cover" />
-        <button onClick={() => onAddToCart(product)} className="absolute bottom-0 left-0 right-0 bg-black dark:bg-gray-900 text-white py-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Link to={`/products/${product.id}`} className="block w-full h-full">
+          <img src={image} alt={product.name} className="w-full h-full object-cover" />
+        </Link>
+        <button onClick={() => onAddToCart(product)} className="absolute bottom-0 left-0 right-0 bg-black dark:bg-gray-900 text-white py-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           Add To Cart
         </button>
       </div>
@@ -217,6 +279,37 @@ function ProductCard({ product, onAddToCart }: { product: api.Product; onAddToCa
         ))}
       </div>
     </div>
+  );
+}
+
+function FeaturedImageCard({ product }: { product: api.Product }) {
+  const image = product.ProductImages?.[0]?.image_url || `https://source.unsplash.com/400x400/?product,${encodeURIComponent(product.name)}`;
+  const currentPrice = Number(product.current_price ?? product.base_price ?? 0);
+  const originalPrice = Number(product.original_price || 0);
+  const sticker = discountSticker(product);
+
+  return (
+    <Link to={`/products/${product.id}`} className="group block">
+      <div className="aspect-square bg-gray-100 dark:bg-gray-800 rounded overflow-hidden relative mb-3">
+        {sticker ? (
+          <span className="absolute top-2 left-2 z-10 bg-red-500 text-white text-xs px-2 py-1 rounded">
+            {sticker}
+          </span>
+        ) : null}
+        <img
+          src={image}
+          alt={product.name}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+      </div>
+      <h4 className="font-semibold text-black dark:text-white mb-1 truncate group-hover:text-red-500">{product.name}</h4>
+      {originalPrice > currentPrice ? (
+        <div className="flex flex-col">
+          <span className="text-sm text-gray-500 line-through">{formatCurrency(originalPrice)}</span>
+          <span className="text-red-500 font-semibold">{formatCurrency(currentPrice)}</span>
+        </div>
+      ) : null}
+    </Link>
   );
 }
 

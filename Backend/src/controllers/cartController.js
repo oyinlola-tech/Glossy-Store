@@ -37,14 +37,43 @@ exports.addToCart = async (req, res, next) => {
   try {
     const { error, value } = validateBody(addToCartSchema, req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
-    const { productVariantId, quantity } = value;
+    const { productVariantId, productId, quantity, note } = value;
+    const noteValue = note ? String(note).trim() : null;
     const parsedQuantity = Number(quantity);
     let cart = await Cart.findOne({ where: { user_id: req.user.id } });
     if (!cart) {
       cart = await Cart.create({ user_id: req.user.id });
     }
 
-    const variant = await ProductVariant.findByPk(productVariantId);
+    let variant = null;
+    if (productVariantId) {
+      variant = await ProductVariant.findByPk(productVariantId);
+    } else if (productId) {
+      variant = await ProductVariant.findOne({
+        where: { product_id: productId },
+        order: [['stock', 'DESC'], ['id', 'ASC']],
+      });
+
+      const product = await Product.findByPk(productId);
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+
+      if (!variant) {
+        variant = await ProductVariant.create({
+          product_id: product.id,
+          stock: Number(product.stock || 0),
+          price_adjustment: 0,
+          color_id: null,
+          size_id: null,
+          image_id: null,
+        });
+      } else if (Number(variant.stock) <= 0 && Number(product.stock || 0) > 0) {
+        variant.stock = Number(product.stock || 0);
+        await variant.save();
+      }
+    }
+
     if (!variant) {
       return res.status(404).json({ error: 'Product variant not found' });
     }
@@ -53,14 +82,17 @@ exports.addToCart = async (req, res, next) => {
     }
 
     const [cartItem, created] = await CartItem.findOrCreate({
-      where: { cart_id: cart.id, product_variant_id: productVariantId },
-      defaults: { quantity: parsedQuantity },
+      where: { cart_id: cart.id, product_variant_id: variant.id },
+      defaults: { quantity: parsedQuantity, note: noteValue },
     });
     if (!created) {
       if (Number(cartItem.quantity) + parsedQuantity > Number(variant.stock)) {
         return res.status(409).json({ error: `Only ${variant.stock} units available` });
       }
       cartItem.quantity += parsedQuantity;
+      if (noteValue) {
+        cartItem.note = noteValue;
+      }
       await cartItem.save();
     } else if (parsedQuantity > Number(variant.stock)) {
       await cartItem.destroy();
@@ -78,7 +110,8 @@ exports.updateCartItem = async (req, res, next) => {
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
     const bodyValidation = validateBody(updateCartItemSchema, req.body);
     if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
-    const { quantity } = bodyValidation.value;
+    const { quantity, note } = bodyValidation.value;
+    const noteValue = note ? String(note).trim() : null;
     const cartItem = await CartItem.findOne({
       where: { id: paramValidation.value.itemId },
       include: [{ model: Cart, where: { user_id: req.user.id } }],
@@ -92,6 +125,9 @@ exports.updateCartItem = async (req, res, next) => {
     }
 
     cartItem.quantity = Number(quantity);
+    if (noteValue !== null) {
+      cartItem.note = noteValue;
+    }
     await cartItem.save();
     res.json(cartItem);
   } catch (err) {

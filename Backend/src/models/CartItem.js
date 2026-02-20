@@ -16,6 +16,10 @@ const CartItem = sequelize.define('CartItem', {
     defaultValue: 1,
     validate: { min: 1 },
   },
+  note: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
 }, {
   timestamps: true,
   underscored: true,

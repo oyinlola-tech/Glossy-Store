@@ -11,8 +11,29 @@ const validateParams = (schema, params) => schema.validate(params, { abortEarly:
 const validateQuery = (schema, query) => schema.validate(query, { abortEarly: true, convert: true, stripUnknown: true });
 const validateBody = (schema, body) => schema.validate(body, { abortEarly: true, stripUnknown: true });
 
-const formatPricing = (product) => {
-  const currentPrice = Number(product.base_price);
+const resolveFlashDiscountPrice = (productJson) => {
+  const sales = Array.isArray(productJson?.FlashSales) ? productJson.FlashSales : [];
+  const prices = sales
+    .map((sale) => Number(sale?.FlashSaleProduct?.discount_price))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (!prices.length) return null;
+  return Math.min(...prices);
+};
+
+const formatPricing = (product, options = {}) => {
+  const basePrice = Number(product.base_price);
+  const flashDiscountPrice = Number.isFinite(options.flashDiscountPrice) ? Number(options.flashDiscountPrice) : null;
+
+  if (flashDiscountPrice !== null && flashDiscountPrice > 0 && flashDiscountPrice < basePrice) {
+    return {
+      current_price: flashDiscountPrice,
+      original_price: basePrice,
+      has_discount: true,
+      discount_label: 'Flash Sale',
+    };
+  }
+
+  const currentPrice = basePrice;
   const originalPrice = product.compare_at_price !== null && product.compare_at_price !== undefined
     ? Number(product.compare_at_price)
     : null;
@@ -69,15 +90,23 @@ exports.getProducts = async (req, res, next) => {
       distinct: true,
     });
 
+    const mappedProducts = products.rows
+      .map((product) => {
+        const productJson = product.toJSON();
+        const flashDiscountPrice = flashSale === true ? resolveFlashDiscountPrice(productJson) : null;
+        return {
+          ...productJson,
+          ...formatPricing(product, { flashDiscountPrice }),
+          ...formatAvailability(product),
+        };
+      })
+      .filter((product) => (flashSale === true ? Number(product.current_price) < Number(product.original_price || 0) : true));
+
     res.json({
-      total: products.count,
+      total: flashSale === true ? mappedProducts.length : products.count,
       page: pageNumber,
-      pages: Math.ceil(products.count / pageSize),
-      products: products.rows.map((product) => ({
-        ...product.toJSON(),
-        ...formatPricing(product),
-        ...formatAvailability(product),
-      })),
+      pages: flashSale === true ? Math.ceil(mappedProducts.length / pageSize) || 1 : Math.ceil(products.count / pageSize),
+      products: mappedProducts,
     });
   } catch (err) {
     next(err);
@@ -93,7 +122,7 @@ exports.getProduct = async (req, res, next) => {
         { model: ProductImage },
         { model: ProductColor },
         { model: ProductSize },
-        { model: ProductVariant },
+        { model: ProductVariant, include: [{ model: ProductColor }, { model: ProductSize }] },
         { model: Rating, include: [{ model: User, attributes: ['id', 'name'] }] },
         { model: Comment, include: [{ model: User, attributes: ['id', 'name'] }] },
       ],

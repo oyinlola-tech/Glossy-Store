@@ -159,15 +159,18 @@ export type Product = {
   name: string;
   description?: string;
   base_price: number | string;
+  stock?: number;
   current_price?: number;
   original_price?: number | null;
+  has_discount?: boolean;
+  discount_label?: string | null;
   average_rating?: number;
   ProductImages?: Array<{ image_url: string }>;
   ProductVariants?: Array<{
     id: number;
     stock: number;
     price_adjustment?: number;
-    ProductColor?: { name?: string };
+    ProductColor?: { name?: string; color_name?: string };
     ProductSize?: { size?: string };
   }>;
 };
@@ -189,6 +192,7 @@ export type CartItemView = {
   unitPrice: number;
   subtotal: number;
   variantLabel: string;
+  note?: string | null;
 };
 
 export type CartView = {
@@ -301,7 +305,7 @@ export const mapCartResponse = (raw: any): CartView => {
     const variant = item?.ProductVariant;
     const product = variant?.Product;
     const price = computeVariantPrice(variant);
-    const color = variant?.ProductColor?.name;
+    const color = variant?.ProductColor?.name || variant?.ProductColor?.color_name;
     const size = variant?.ProductSize?.size;
     const variantLabel = [color, size].filter(Boolean).join(' / ');
     return {
@@ -313,6 +317,7 @@ export const mapCartResponse = (raw: any): CartView => {
       unitPrice: price,
       subtotal: price * toNumber(item.quantity, 1),
       variantLabel,
+      note: item.note ?? null,
     };
   });
   return {
@@ -468,17 +473,17 @@ export const commentProduct = (id: number | string, comment: string) =>
 
 // Cart
 export const getCart = () => apiCall('/cart', { requireAuth: true });
-export const addToCart = (data: { productVariantId: number; quantity: number }) =>
+export const addToCart = (data: { productVariantId?: number; productId?: number; quantity: number; note?: string | null }) =>
   apiCall('/cart', {
     method: 'POST',
     requireAuth: true,
     body: JSON.stringify(data),
   });
-export const updateCartItem = (itemId: number | string, quantity: number) =>
+export const updateCartItem = (itemId: number | string, quantity: number, note?: string | null) =>
   apiCall(`/cart/${itemId}`, {
     method: 'PUT',
     requireAuth: true,
-    body: JSON.stringify({ quantity }),
+    body: JSON.stringify(note ? { quantity, note } : { quantity }),
   });
 export const deleteCartItem = (itemId: number | string) =>
   apiCall(`/cart/${itemId}`, {

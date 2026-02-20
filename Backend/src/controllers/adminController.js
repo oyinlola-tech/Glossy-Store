@@ -38,6 +38,71 @@ const validateBody = (schema, body) => schema.validate(body, { abortEarly: true,
 const validateParams = (schema, params) => schema.validate(params, { abortEarly: true, convert: true, stripUnknown: true });
 const validateQuery = (schema, query) => schema.validate(query, { abortEarly: true, convert: true, stripUnknown: true });
 
+const parseJsonField = (value) => {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+};
+
+const normalizeProductPayload = (body) => {
+  const normalized = { ...body };
+  ['colors', 'sizes', 'variants'].forEach((key) => {
+    if (normalized[key] !== undefined) {
+      normalized[key] = parseJsonField(normalized[key]);
+    }
+  });
+  return normalized;
+};
+
+const distributeStockAcrossVariants = (totalStock, variantCount) => {
+  const total = Math.max(0, Number(totalStock || 0));
+  if (!variantCount || variantCount <= 0) return [];
+  const base = Math.floor(total / variantCount);
+  const remainder = total % variantCount;
+  return Array.from({ length: variantCount }, (_, index) => base + (index < remainder ? 1 : 0));
+};
+
+const buildAutoVariants = async (productId, totalStock, transaction = undefined) => {
+  const [colors, sizes] = await Promise.all([
+    ProductColor.findAll({ where: { product_id: productId }, attributes: ['id'], transaction }),
+    ProductSize.findAll({ where: { product_id: productId }, attributes: ['id'], transaction }),
+  ]);
+  const colorIds = colors.map((entry) => entry.id);
+  const sizeIds = sizes.map((entry) => entry.id);
+
+  const combos = [];
+  if (colorIds.length && sizeIds.length) {
+    colorIds.forEach((colorId) => {
+      sizeIds.forEach((sizeId) => {
+        combos.push({ color_id: colorId, size_id: sizeId });
+      });
+    });
+  } else if (colorIds.length) {
+    colorIds.forEach((colorId) => {
+      combos.push({ color_id: colorId, size_id: null });
+    });
+  } else if (sizeIds.length) {
+    sizeIds.forEach((sizeId) => {
+      combos.push({ color_id: null, size_id: sizeId });
+    });
+  }
+
+  if (!combos.length) return [];
+  const distributedStock = distributeStockAcrossVariants(totalStock, combos.length);
+  return combos.map((combo, index) => ({
+    product_id: productId,
+    color_id: combo.color_id,
+    size_id: combo.size_id,
+    sku: null,
+    price_adjustment: 0,
+    stock: distributedStock[index],
+    image_id: null,
+  }));
+};
+
 const syncProductStockFromVariants = async (productId, transaction = undefined) => {
   const variants = await ProductVariant.findAll({
     where: { product_id: productId },
@@ -227,7 +292,8 @@ exports.getProduct = async (req, res, next) => {
 
 exports.createProduct = async (req, res, next) => {
   try {
-    const { error, value } = validateBody(productCreateSchema, req.body);
+    const normalizedBody = normalizeProductPayload(req.body);
+    const { error, value } = validateBody(productCreateSchema, normalizedBody);
     if (error) return res.status(400).json({ error: error.details[0].message });
     const {
       category_id,
@@ -272,6 +338,12 @@ exports.createProduct = async (req, res, next) => {
       if (variants && variants.length) {
         await ProductVariant.bulkCreate(variants.map((v) => ({ ...v, product_id: created.id })), { transaction });
         await syncProductStockFromVariants(created.id, transaction);
+      } else if ((colors && colors.length) || (sizes && sizes.length)) {
+        const autoVariants = await buildAutoVariants(created.id, stock, transaction);
+        if (autoVariants.length) {
+          await ProductVariant.bulkCreate(autoVariants, { transaction });
+          await syncProductStockFromVariants(created.id, transaction);
+        }
       }
 
       if (req.files && req.files.length) {
@@ -295,7 +367,8 @@ exports.updateProduct = async (req, res, next) => {
   try {
     const paramValidation = validateParams(idParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
-    const bodyValidation = validateBody(productUpdateSchema, req.body);
+    const normalizedBody = normalizeProductPayload(req.body);
+    const bodyValidation = validateBody(productUpdateSchema, normalizedBody);
     if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
     const product = await Product.findByPk(paramValidation.value.id);
     if (!product) return res.status(404).json({ error: 'Product not found' });
@@ -312,30 +385,49 @@ exports.updateProduct = async (req, res, next) => {
 
     await sequelize.transaction(async (transaction) => {
       await product.update(bodyValidation.value, { transaction });
+      const hasColors = Object.prototype.hasOwnProperty.call(bodyValidation.value, 'colors');
+      const hasSizes = Object.prototype.hasOwnProperty.call(bodyValidation.value, 'sizes');
+      const hasVariants = Object.prototype.hasOwnProperty.call(bodyValidation.value, 'variants');
 
-      if (bodyValidation.value.colors) {
+      if (hasColors) {
         await ProductColor.destroy({ where: { product_id: product.id }, transaction });
-        await ProductColor.bulkCreate(
-          bodyValidation.value.colors.map((c) => ({ ...c, product_id: product.id })),
-          { transaction }
-        );
+        if (bodyValidation.value.colors && bodyValidation.value.colors.length) {
+          await ProductColor.bulkCreate(
+            bodyValidation.value.colors.map((c) => ({ ...c, product_id: product.id })),
+            { transaction }
+          );
+        }
       }
 
-      if (bodyValidation.value.sizes) {
+      if (hasSizes) {
         await ProductSize.destroy({ where: { product_id: product.id }, transaction });
-        await ProductSize.bulkCreate(
-          bodyValidation.value.sizes.map((s) => ({ size: s, product_id: product.id })),
-          { transaction }
-        );
+        if (bodyValidation.value.sizes && bodyValidation.value.sizes.length) {
+          await ProductSize.bulkCreate(
+            bodyValidation.value.sizes.map((s) => ({ size: s, product_id: product.id })),
+            { transaction }
+          );
+        }
       }
 
-      if (bodyValidation.value.variants) {
+      if (hasVariants) {
         await ProductVariant.destroy({ where: { product_id: product.id }, transaction });
-        await ProductVariant.bulkCreate(
-          bodyValidation.value.variants.map((v) => ({ ...v, product_id: product.id })),
-          { transaction }
-        );
+        if (bodyValidation.value.variants && bodyValidation.value.variants.length) {
+          await ProductVariant.bulkCreate(
+            bodyValidation.value.variants.map((v) => ({ ...v, product_id: product.id })),
+            { transaction }
+          );
+        }
         await syncProductStockFromVariants(product.id, transaction);
+      } else if (hasColors || hasSizes) {
+        await ProductVariant.destroy({ where: { product_id: product.id }, transaction });
+        const variantStockSeed = bodyValidation.value.stock !== undefined
+          ? bodyValidation.value.stock
+          : product.stock;
+        const autoVariants = await buildAutoVariants(product.id, variantStockSeed, transaction);
+        if (autoVariants.length) {
+          await ProductVariant.bulkCreate(autoVariants, { transaction });
+          await syncProductStockFromVariants(product.id, transaction);
+        }
       }
 
       if (req.files && req.files.length) {
@@ -376,6 +468,21 @@ exports.createFlashSale = async (req, res, next) => {
     const { name, description, start_time, end_time, products } = value;
     const flashSale = await FlashSale.create({ name, description, start_time, end_time });
     if (products && products.length) {
+      const productRows = await Product.findAll({
+        where: { id: products.map((p) => p.product_id) },
+        attributes: ['id', 'base_price'],
+      });
+      const byId = new Map(productRows.map((p) => [Number(p.id), Number(p.base_price)]));
+      for (const item of products) {
+        const basePrice = byId.get(Number(item.product_id));
+        if (!basePrice) {
+          return res.status(400).json({ error: `Product ${item.product_id} not found` });
+        }
+        if (Number(item.discount_price) >= basePrice) {
+          return res.status(400).json({ error: `Discount price must be lower than base price for product ${item.product_id}` });
+        }
+      }
+
       const productLinks = products.map((p) => ({
         flash_sale_id: flashSale.id,
         product_id: p.product_id,
@@ -411,6 +518,21 @@ exports.updateFlashSale = async (req, res, next) => {
     await flashSale.update(bodyValidation.value);
 
     if (bodyValidation.value.products) {
+      const productRows = await Product.findAll({
+        where: { id: bodyValidation.value.products.map((p) => p.product_id) },
+        attributes: ['id', 'base_price'],
+      });
+      const byId = new Map(productRows.map((p) => [Number(p.id), Number(p.base_price)]));
+      for (const item of bodyValidation.value.products) {
+        const basePrice = byId.get(Number(item.product_id));
+        if (!basePrice) {
+          return res.status(400).json({ error: `Product ${item.product_id} not found` });
+        }
+        if (Number(item.discount_price) >= basePrice) {
+          return res.status(400).json({ error: `Discount price must be lower than base price for product ${item.product_id}` });
+        }
+      }
+
       await FlashSaleProduct.destroy({ where: { flash_sale_id: flashSale.id } });
       const productLinks = bodyValidation.value.products.map((p) => ({
         flash_sale_id: flashSale.id,

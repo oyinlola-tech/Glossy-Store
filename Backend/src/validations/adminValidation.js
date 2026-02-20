@@ -36,7 +36,7 @@ const flashSaleCreateSchema = Joi.object({
   products: Joi.array().items(Joi.object({
     product_id: Joi.number().integer().positive().required(),
     discount_price: Joi.number().positive().required(),
-  })).optional(),
+  })).max(8).optional(),
 });
 
 const flashSaleUpdateSchema = Joi.object({
@@ -47,7 +47,7 @@ const flashSaleUpdateSchema = Joi.object({
   products: Joi.array().items(Joi.object({
     product_id: Joi.number().integer().positive().required(),
     discount_price: Joi.number().positive().required(),
-  })).optional(),
+  })).max(8).optional(),
 }).custom((value, helpers) => {
   if (value.start_time && value.end_time && new Date(value.end_time) <= new Date(value.start_time)) {
     return helpers.error('any.invalid');

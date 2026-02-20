@@ -13,6 +13,7 @@ type LocalCartItem = {
   quantity: number;
   image?: string | null;
   variantLabel?: string;
+  note?: string | null;
 };
 
 export function CartPage() {
@@ -51,6 +52,7 @@ export function CartPage() {
         unitPrice: Number(item.unitPrice || 0),
         subtotal: Number(item.unitPrice || 0) * Number(item.quantity || 1),
         variantLabel: item.variantLabel || '',
+        note: item.note || null,
       }));
       setCart({ items, subtotal: items.reduce((sum, item) => sum + item.subtotal, 0) });
     } catch (error) {
@@ -173,6 +175,7 @@ export function CartPage() {
                       <div>
                         <h3 className="font-semibold text-black dark:text-white">{item.productName}</h3>
                         {item.variantLabel ? <p className="text-sm text-gray-500 dark:text-gray-400">{item.variantLabel}</p> : null}
+                        {item.note ? <p className="text-xs text-gray-500 dark:text-gray-400">Message: {item.note}</p> : null}
                       </div>
                     </div>
                     <div className="text-gray-600 dark:text-gray-400">{formatCurrency(item.unitPrice)}</div>
