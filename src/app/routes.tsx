@@ -117,7 +117,7 @@ export const router = createBrowserRouter([
       { path: 'payment/verify', element: <PaymentVerifyPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
       { path: 'products', element: <MainLayout><ProductsPage /></MainLayout> },
-      { path: 'products/:id', element: <MainLayout><ProductDetailPage /></MainLayout> },
+      { path: 'products/:slugOrId', element: <MainLayout><ProductDetailPage /></MainLayout> },
       { path: 'cart', element: <MainLayout><CartPage /></MainLayout> },
       {
         path: 'checkout',

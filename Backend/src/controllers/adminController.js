@@ -27,6 +27,7 @@ const {
   productUpdateSchema,
   productIdParamSchema,
 } = require('../validations/productValidation');
+const { buildUniqueProductSlug } = require('../services/productSlugService');
 const { idParamSchema } = require('../validations/commonValidation');
 const {
   financeSummaryQuerySchema,
@@ -317,9 +318,11 @@ exports.createProduct = async (req, res, next) => {
     }
 
     const product = await sequelize.transaction(async (transaction) => {
+      const slug = await buildUniqueProductSlug(name);
       const created = await Product.create({
         category_id,
         name,
+        slug,
         description,
         base_price,
         compare_at_price: compare_at_price || null,
@@ -384,7 +387,11 @@ exports.updateProduct = async (req, res, next) => {
     }
 
     await sequelize.transaction(async (transaction) => {
-      await product.update(bodyValidation.value, { transaction });
+      const updates = { ...bodyValidation.value };
+      if (updates.name && String(updates.name).trim() !== String(product.name || '').trim()) {
+        updates.slug = await buildUniqueProductSlug(updates.name, product.id);
+      }
+      await product.update(updates, { transaction });
       const hasColors = Object.prototype.hasOwnProperty.call(bodyValidation.value, 'colors');
       const hasSizes = Object.prototype.hasOwnProperty.call(bodyValidation.value, 'sizes');
       const hasVariants = Object.prototype.hasOwnProperty.call(bodyValidation.value, 'variants');

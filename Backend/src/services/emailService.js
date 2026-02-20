@@ -5,6 +5,7 @@ const {
   renderDeviceChangeTemplate,
   renderContactReplyTemplate,
   renderPaymentReceiptTemplate,
+  renderWeeklyMarketingTemplate,
 } = require('./emailTemplates');
 
 const isEmailConfigured = () => {
@@ -61,4 +62,19 @@ const sendPaymentReceiptEmail = async ({ email, name, amount, currency, status, 
   return sendEmail({ to: email, subject, html });
 };
 
-module.exports = { sendEmail, sendOTPEmail, sendWelcomeEmail, sendDeviceChangeEmail, sendContactReplyEmail, sendPaymentReceiptEmail, isEmailConfigured };
+const sendWeeklyMarketingEmail = async ({ email, products }) => {
+  const subject = `${process.env.BRAND_NAME || 'Glossy Store'} weekly product highlights`;
+  const html = renderWeeklyMarketingTemplate({ products });
+  return sendEmail({ to: email, subject, html });
+};
+
+module.exports = {
+  sendEmail,
+  sendOTPEmail,
+  sendWelcomeEmail,
+  sendDeviceChangeEmail,
+  sendContactReplyEmail,
+  sendPaymentReceiptEmail,
+  sendWeeklyMarketingEmail,
+  isEmailConfigured,
+};

@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const { app, initializeDatabase } = require('./src/app');
 const { setupSupportSocket } = require('./src/socket/supportSocket');
 const { validateEnvironment } = require('./src/config/envValidation');
+const { scheduleWeeklyMarketingEmails } = require('./src/services/marketingEmailService');
 
 const DEFAULT_PORT = Number(process.env.PORT || 5000);
 const MAX_PORT_RETRIES = Number(process.env.PORT_RETRY_COUNT || 20);
@@ -47,6 +48,7 @@ const startServer = async () => {
     const allowStartWithoutDb = String(process.env.ALLOW_START_WITHOUT_DB || '').toLowerCase() === 'true';
     try {
       await initializeDatabase();
+      scheduleWeeklyMarketingEmails();
     } catch (dbErr) {
       if (!allowStartWithoutDb) throw dbErr;
       console.error('Database initialization failed. Starting in limited mode:', dbErr.message);

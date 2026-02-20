@@ -29,7 +29,7 @@ const addToLocalCart = (payload: {
 };
 
 export function ProductDetailPage() {
-  const { id } = useParams();
+  const { slugOrId } = useParams();
   const [product, setProduct] = useState<api.Product | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
@@ -46,9 +46,9 @@ export function ProductDetailPage() {
 
   useEffect(() => {
     const load = async () => {
-      if (!id) return;
+      if (!slugOrId) return;
       try {
-        const data = await api.getProduct(id);
+        const data = await api.getProduct(slugOrId);
         setProduct(data);
         const firstAvailable = data.ProductVariants?.find((variant) => Number(variant.stock) > 0);
         setSelectedVariantId(firstAvailable?.id || data.ProductVariants?.[0]?.id || null);
@@ -65,7 +65,7 @@ export function ProductDetailPage() {
       }
     };
     void load();
-  }, [id]);
+  }, [slugOrId]);
 
   const colorOptions = useMemo(() => {
     const entries = product?.ProductVariants || [];
@@ -155,16 +155,16 @@ export function ProductDetailPage() {
   };
 
   const submitReview = async () => {
-    if (!id) return;
+    if (!slugOrId) return;
     if (!user) {
       toast.error('Please login to post a review');
       navigate('/login');
       return;
     }
     try {
-      await api.rateProduct(id, rating);
+      await api.rateProduct(slugOrId, rating);
       if (comment.trim()) {
-        await api.commentProduct(id, comment.trim());
+        await api.commentProduct(slugOrId, comment.trim());
       }
       toast.success('Review submitted');
       setComment('');

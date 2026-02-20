@@ -4,6 +4,10 @@ const productIdParamSchema = Joi.object({
   id: Joi.number().integer().positive().required(),
 });
 
+const productIdentifierParamSchema = Joi.object({
+  idOrSlug: Joi.string().trim().min(1).max(255).required(),
+});
+
 const productQuerySchema = Joi.object({
   category: Joi.number().integer().positive().optional(),
   minPrice: Joi.number().min(0).optional(),
@@ -93,6 +97,7 @@ module.exports = {
   productCreateSchema,
   productUpdateSchema,
   productIdParamSchema,
+  productIdentifierParamSchema,
   productQuerySchema,
   ratingSchema,
   commentSchema,

@@ -345,18 +345,18 @@ function ProductCard({
           <button onClick={onAddToWishlist} className="bg-white dark:bg-gray-700 rounded-full p-2 hover:bg-red-500 hover:text-white transition-colors">
             <Heart className="size-4" />
           </button>
-          <Link to={`/products/${product.id}`} className="bg-white dark:bg-gray-700 rounded-full p-2 hover:bg-red-500 hover:text-white transition-colors">
+          <Link to={api.getProductPath(product)} className="bg-white dark:bg-gray-700 rounded-full p-2 hover:bg-red-500 hover:text-white transition-colors">
             <Eye className="size-4" />
           </Link>
         </div>
-        <Link to={`/products/${product.id}`} className="block w-full h-full">
+        <Link to={api.getProductPath(product)} className="block w-full h-full">
           <img src={image} alt={product.name} className="w-full h-full object-cover" />
         </Link>
         <button onClick={onAddToCart} className="absolute bottom-0 left-0 right-0 bg-black dark:bg-gray-900 text-white py-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           Add To Cart
         </button>
       </div>
-      <Link to={`/products/${product.id}`}>
+      <Link to={api.getProductPath(product)}>
         <h4 className="font-semibold text-black dark:text-white mb-1 hover:text-red-500">{product.name}</h4>
       </Link>
       <div className="flex items-center gap-2 mb-1">

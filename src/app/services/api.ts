@@ -156,6 +156,7 @@ export type UpdateUserProfileResponse = {
 
 export type Product = {
   id: number;
+  slug?: string;
   name: string;
   description?: string;
   base_price: number | string;
@@ -173,6 +174,11 @@ export type Product = {
     ProductColor?: { name?: string; color_name?: string };
     ProductSize?: { size?: string };
   }>;
+};
+
+export const getProductPath = (product?: Pick<Product, 'id' | 'slug'> | null) => {
+  if (!product) return '/products';
+  return `/products/${encodeURIComponent(String(product.slug || product.id))}`;
 };
 
 export type Category = {
@@ -452,20 +458,20 @@ export const getProducts = (params?: {
   );
 };
 
-export const getProduct = (id: number | string) => apiCall<Product>(`/products/${id}`);
+export const getProduct = (idOrSlug: number | string) => apiCall<Product>(`/products/${encodeURIComponent(String(idOrSlug))}`);
 export const getCategories = (params?: { tree?: boolean }) => {
   const search = new URLSearchParams();
   if (typeof params?.tree === 'boolean') search.set('tree', String(params.tree));
   return apiCall<{ categories: Category[] }>(`/categories${search.toString() ? `?${search.toString()}` : ''}`);
 };
-export const rateProduct = (id: number | string, rating: number, review?: string) =>
-  apiCall(`/products/${id}/rate`, {
+export const rateProduct = (idOrSlug: number | string, rating: number, review?: string) =>
+  apiCall(`/products/${encodeURIComponent(String(idOrSlug))}/rate`, {
     method: 'POST',
     requireAuth: true,
     body: JSON.stringify({ rating, review }),
   });
-export const commentProduct = (id: number | string, comment: string) =>
-  apiCall(`/products/${id}/comment`, {
+export const commentProduct = (idOrSlug: number | string, comment: string) =>
+  apiCall(`/products/${encodeURIComponent(String(idOrSlug))}/comment`, {
     method: 'POST',
     requireAuth: true,
     body: JSON.stringify({ comment }),

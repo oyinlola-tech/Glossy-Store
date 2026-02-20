@@ -1,7 +1,7 @@
 const { Product, Category, ProductImage, ProductColor, ProductSize, ProductVariant, Rating, Comment, FlashSale, User, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const {
-  productIdParamSchema,
+  productIdentifierParamSchema,
   productQuerySchema,
   ratingSchema,
   commentSchema,
@@ -50,6 +50,19 @@ const formatAvailability = (product) => ({
   stock: Number(product.stock || 0),
   is_out_of_stock: Number(product.stock || 0) <= 0,
 });
+
+const isNumericIdentifier = (value) => /^\d+$/.test(String(value || ''));
+
+const findProductByIdentifier = async (identifier, include = []) => {
+  const normalized = String(identifier || '').trim();
+  if (isNumericIdentifier(normalized)) {
+    return Product.findByPk(Number(normalized), { include });
+  }
+  return Product.findOne({
+    where: { slug: normalized.toLowerCase() },
+    include,
+  });
+};
 
 exports.getProducts = async (req, res, next) => {
   try {
@@ -115,18 +128,16 @@ exports.getProducts = async (req, res, next) => {
 
 exports.getProduct = async (req, res, next) => {
   try {
-    const paramValidation = validateParams(productIdParamSchema, req.params);
+    const paramValidation = validateParams(productIdentifierParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
-    const product = await Product.findByPk(paramValidation.value.id, {
-      include: [
-        { model: ProductImage },
-        { model: ProductColor },
-        { model: ProductSize },
-        { model: ProductVariant, include: [{ model: ProductColor }, { model: ProductSize }] },
-        { model: Rating, include: [{ model: User, attributes: ['id', 'name'] }] },
-        { model: Comment, include: [{ model: User, attributes: ['id', 'name'] }] },
-      ],
-    });
+    const product = await findProductByIdentifier(paramValidation.value.idOrSlug, [
+      { model: ProductImage },
+      { model: ProductColor },
+      { model: ProductSize },
+      { model: ProductVariant, include: [{ model: ProductColor }, { model: ProductSize }] },
+      { model: Rating, include: [{ model: User, attributes: ['id', 'name'] }] },
+      { model: Comment, include: [{ model: User, attributes: ['id', 'name'] }] },
+    ]);
     if (!product) return res.status(404).json({ error: 'Product not found' });
     res.json({
       ...product.toJSON(),
@@ -140,18 +151,17 @@ exports.getProduct = async (req, res, next) => {
 
 exports.addRating = async (req, res, next) => {
   try {
-    const paramValidation = validateParams(productIdParamSchema, req.params);
+    const paramValidation = validateParams(productIdentifierParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
     const bodyValidation = validateBody(ratingSchema, req.body);
     if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
     const { rating, review } = bodyValidation.value;
-    const productId = paramValidation.value.id;
     const userId = req.user.id;
-    const product = await Product.findByPk(productId);
+    const product = await findProductByIdentifier(paramValidation.value.idOrSlug);
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
     const [ratingRecord, created] = await Rating.findOrCreate({
-      where: { user_id: userId, product_id: productId },
+      where: { user_id: userId, product_id: product.id },
       defaults: { rating, review },
     });
     if (!created) {
@@ -162,10 +172,10 @@ exports.addRating = async (req, res, next) => {
 
     // Update product average rating
     const avg = await Rating.findOne({
-      where: { product_id: productId },
+      where: { product_id: product.id },
       attributes: [[sequelize.fn('AVG', sequelize.col('rating')), 'avg']],
     });
-    await Product.update({ average_rating: avg.dataValues.avg }, { where: { id: productId } });
+    await Product.update({ average_rating: avg.dataValues.avg }, { where: { id: product.id } });
 
     res.json(ratingRecord);
   } catch (err) {
@@ -175,19 +185,18 @@ exports.addRating = async (req, res, next) => {
 
 exports.addComment = async (req, res, next) => {
   try {
-    const paramValidation = validateParams(productIdParamSchema, req.params);
+    const paramValidation = validateParams(productIdentifierParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
     const bodyValidation = validateBody(commentSchema, req.body);
     if (bodyValidation.error) return res.status(400).json({ error: bodyValidation.error.details[0].message });
     const { comment } = bodyValidation.value;
-    const productId = paramValidation.value.id;
     const userId = req.user.id;
-    const product = await Product.findByPk(productId);
+    const product = await findProductByIdentifier(paramValidation.value.idOrSlug);
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
     const newComment = await Comment.create({
       user_id: userId,
-      product_id: productId,
+      product_id: product.id,
       comment,
     });
     res.status(201).json(newComment);

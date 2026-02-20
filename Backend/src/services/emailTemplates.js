@@ -150,6 +150,87 @@ const renderContactReplyTemplate = ({ name, reply }) => {
   });
 };
 
+const formatPrice = (amount, currency = 'NGN') => {
+  const value = Number(amount || 0);
+  return `${currency} ${value.toFixed(2)}`;
+};
+
+const renderWeeklyMarketingTemplate = ({ products = [] }) => {
+  const t = getBrandTokens();
+  const currency = process.env.BRAND_CURRENCY || 'NGN';
+  const safeProducts = Array.isArray(products) ? products.slice(0, 12) : [];
+  const itemsHtml = safeProducts.map((product, index) => {
+    const name = escapeHtml(product?.name || 'Product');
+    const url = escapeHtml(product?.url || t.appUrl);
+    const price = formatPrice(product?.price, currency);
+    return `
+      <tr>
+        <td style="padding:14px 0;border-bottom:1px solid ${t.accentSecondary};">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+            <tr>
+              <td style="font-size:14px;color:${t.accentSecondary};width:30px;">${index + 1}.</td>
+              <td style="font-size:15px;color:${t.accentSecondary};font-weight:600;line-height:1.5;">
+                <a href="${url}" style="color:${t.accentSecondary};text-decoration:none;">${name}</a>
+              </td>
+              <td style="font-size:15px;color:${t.accentPrimary};font-weight:700;text-align:right;white-space:nowrap;">${price}</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td colspan="2" style="padding-top:6px;">
+                <a href="${url}" style="display:inline-block;padding:7px 12px;background:${t.accentPrimary};color:#ffffff;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;">View Product</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>`;
+  }).join('');
+
+  return `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${t.brandName} Weekly Picks</title>
+  </head>
+  <body style="margin:0;padding:0;background:#ffffff;font-family:Segoe UI,Arial,sans-serif;color:${t.accentSecondary};">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 12px;background:#ffffff;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:2px solid ${t.accentSecondary};">
+            <tr>
+              <td style="padding:20px 24px;background:${t.accentSecondary};">
+                <h1 style="margin:0;font-size:26px;line-height:1.2;color:#ffffff;">${t.brandName}</h1>
+                <p style="margin:8px 0 0 0;font-size:13px;color:#ffffff;">Weekly product highlights</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:22px 24px 10px 24px;">
+                <h2 style="margin:0 0 10px 0;font-size:22px;color:${t.accentSecondary};">Latest 12 Products</h2>
+                <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:${t.accentSecondary};">
+                  Discover what is new this week. Each product below links directly to its page.
+                </p>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  ${itemsHtml || '<tr><td style="font-size:14px;color:' + t.accentSecondary + ';">No products available right now.</td></tr>'}
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:14px 24px 22px 24px;background:${t.accentSecondary};">
+                <a href="${escapeHtml(t.appUrl)}" style="display:inline-block;padding:10px 16px;background:${t.accentPrimary};color:#ffffff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:700;">Shop All Products</a>
+                <p style="margin:12px 0 0 0;font-size:12px;line-height:1.6;color:#ffffff;">
+                  ${t.brandName} | ${new Date().getFullYear()}
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+  </html>`;
+};
+
 const renderPaymentReceiptTemplate = ({ name, email, amount, currency, status, reference, eventLabel, occurredAt }) => {
   const t = templateVars();
   const safeName = name || 'Customer';
@@ -201,5 +282,6 @@ module.exports = {
   renderWelcomeTemplate,
   renderDeviceChangeTemplate,
   renderContactReplyTemplate,
+  renderWeeklyMarketingTemplate,
   renderPaymentReceiptTemplate,
 };
