@@ -294,6 +294,22 @@ export type FinanceTransaction = {
   User?: { id: number; name: string; email: string };
 };
 
+export type FlashSaleProductLink = {
+  flash_sale_id?: number;
+  product_id: number;
+  discount_price: number | string;
+  Product?: Product;
+};
+
+export type FlashSale = {
+  id: number;
+  name: string;
+  description?: string | null;
+  start_time: string;
+  end_time: string;
+  Products?: Array<Product & { FlashSaleProduct?: FlashSaleProductLink }>;
+};
+
 const toNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -559,6 +575,39 @@ export const deleteAdminUser = (id: number | string) =>
   });
 export const getAdminProducts = () => apiCall('/admin/products', { requireAuth: true });
 export const getAdminProduct = (id: number | string) => apiCall(`/admin/products/${id}`, { requireAuth: true });
+export const getFlashSales = () => apiCall<FlashSale[]>('/admin/flash-sales', { requireAuth: true });
+export const createFlashSale = (data: {
+  name: string;
+  description?: string;
+  start_time: string;
+  end_time: string;
+  products?: Array<{ product_id: number; discount_price: number }>;
+}) =>
+  apiCall<FlashSale>('/admin/flash-sales', {
+    method: 'POST',
+    requireAuth: true,
+    body: JSON.stringify(data),
+  });
+export const updateFlashSale = (
+  id: number | string,
+  data: Partial<{
+    name: string;
+    description: string;
+    start_time: string;
+    end_time: string;
+    products: Array<{ product_id: number; discount_price: number }>;
+  }>
+) =>
+  apiCall<FlashSale>(`/admin/flash-sales/${id}`, {
+    method: 'PUT',
+    requireAuth: true,
+    body: JSON.stringify(data),
+  });
+export const deleteFlashSale = (id: number | string) =>
+  apiCall<{ message: string }>(`/admin/flash-sales/${id}`, {
+    method: 'DELETE',
+    requireAuth: true,
+  });
 export const createProduct = (data: FormData) =>
   apiCall('/admin/products', {
     method: 'POST',

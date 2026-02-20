@@ -106,8 +106,8 @@ export function SuperAdminDashboard() {
             className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
           >
             <Settings className="size-12 text-red-500 mb-4" />
-            <h3 className="text-xl font-semibold text-black dark:text-white mb-2">System Settings</h3>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">Configure system settings</p>
+            <h3 className="text-xl font-semibold text-black dark:text-white mb-2">System Control Center</h3>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">Check platform status and run admin actions</p>
           </Link>
 
           <Link
