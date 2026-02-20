@@ -257,18 +257,18 @@ function ProductCard({ product, onAddToCart }: { product: api.Product; onAddToCa
           <button className="bg-white dark:bg-gray-700 rounded-full p-2 hover:bg-red-500 hover:text-white transition-colors">
             <Heart className="size-4" />
           </button>
-          <Link to={`/products/${product.id}`} className="bg-white dark:bg-gray-700 rounded-full p-2 hover:bg-red-500 hover:text-white transition-colors">
+          <Link to={api.getProductPath(product)} className="bg-white dark:bg-gray-700 rounded-full p-2 hover:bg-red-500 hover:text-white transition-colors">
             <Eye className="size-4" />
           </Link>
         </div>
-        <Link to={`/products/${product.id}`} className="block w-full h-full">
+        <Link to={api.getProductPath(product)} className="block w-full h-full">
           <img src={image} alt={product.name} className="w-full h-full object-cover" />
         </Link>
         <button onClick={() => onAddToCart(product)} className="absolute bottom-0 left-0 right-0 bg-black dark:bg-gray-900 text-white py-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           Add To Cart
         </button>
       </div>
-      <Link to={`/products/${product.id}`}>
+      <Link to={api.getProductPath(product)}>
         <h4 className="font-semibold text-black dark:text-white mb-1 hover:text-red-500">{product.name}</h4>
       </Link>
       <div className="flex items-center gap-2 mb-1">
@@ -291,7 +291,7 @@ function FeaturedImageCard({ product }: { product: api.Product }) {
   const sticker = discountSticker(product);
 
   return (
-    <Link to={`/products/${product.id}`} className="group block">
+    <Link to={api.getProductPath(product)} className="group block">
       <div className="aspect-square bg-gray-100 dark:bg-gray-800 rounded overflow-hidden relative mb-3">
         {sticker ? (
           <span className="absolute top-2 left-2 z-10 bg-red-500 text-white text-xs px-2 py-1 rounded">

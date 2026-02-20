@@ -479,7 +479,7 @@ export function AdminProductsPage() {
         {products.map((product) => (
           <div key={product.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow flex items-center justify-between">
             <div>
-              <Link to={`/products/${product.id}`} className="font-semibold text-black dark:text-white hover:text-red-500">
+              <Link to={api.getProductPath(product)} className="font-semibold text-black dark:text-white hover:text-red-500">
                 {product.name}
               </Link>
               <p className="text-sm text-gray-500 dark:text-gray-400">{formatCurrency(Number(product.base_price || 0))}</p>

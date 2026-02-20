@@ -100,7 +100,7 @@ export function WishlistPage() {
             return (
               <div key={entry.id} className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
                 <img src={image} alt={product?.name} className="w-full h-52 object-cover rounded-lg mb-3" />
-                <Link to={`/products/${product?.id}`} className="font-semibold text-black dark:text-white hover:text-red-500">
+                <Link to={api.getProductPath(product)} className="font-semibold text-black dark:text-white hover:text-red-500">
                   {product?.name}
                 </Link>
                 <div className="mt-4 flex items-center gap-2">
