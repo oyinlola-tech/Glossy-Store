@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import * as api from '../services/api';
@@ -43,6 +43,7 @@ export function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const load = async () => {
@@ -50,6 +51,11 @@ export function ProductDetailPage() {
       try {
         const data = await api.getProduct(slugOrId);
         setProduct(data);
+        const canonicalPath = api.getProductPath(data);
+        if (canonicalPath && canonicalPath !== location.pathname) {
+          navigate(canonicalPath, { replace: true });
+          return;
+        }
         const firstAvailable = data.ProductVariants?.find((variant) => Number(variant.stock) > 0);
         setSelectedVariantId(firstAvailable?.id || data.ProductVariants?.[0]?.id || null);
         const seedVariant = firstAvailable || data.ProductVariants?.[0];
@@ -65,7 +71,7 @@ export function ProductDetailPage() {
       }
     };
     void load();
-  }, [slugOrId]);
+  }, [location.pathname, navigate, slugOrId]);
 
   const colorOptions = useMemo(() => {
     const entries = product?.ProductVariants || [];

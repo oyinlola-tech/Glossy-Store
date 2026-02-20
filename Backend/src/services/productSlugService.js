@@ -28,4 +28,42 @@ const buildUniqueProductSlug = async (name, excludeProductId = null) => {
   return `${baseSlug}-${index}`;
 };
 
-module.exports = { buildUniqueProductSlug };
+const ensureProductSlug = async (product, transaction = undefined) => {
+  if (!product) return null;
+  if (product.slug && String(product.slug).trim()) return String(product.slug).trim();
+
+  const slug = await buildUniqueProductSlug(product.name, product.id);
+  await product.update({ slug }, { transaction });
+  return slug;
+};
+
+const ensureAllProductSlugs = async () => {
+  const products = await Product.findAll({
+    where: {
+      [Op.or]: [
+        { slug: null },
+        { slug: '' },
+      ],
+    },
+    attributes: ['id', 'name', 'slug'],
+    order: [['id', 'ASC']],
+  });
+
+  if (!products.length) {
+    return { updated: 0 };
+  }
+
+  let updated = 0;
+  for (const product of products) {
+    await ensureProductSlug(product);
+    updated += 1;
+  }
+
+  return { updated };
+};
+
+module.exports = {
+  buildUniqueProductSlug,
+  ensureProductSlug,
+  ensureAllProductSlugs,
+};

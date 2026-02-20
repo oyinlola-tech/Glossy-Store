@@ -5,6 +5,8 @@ const { app, initializeDatabase } = require('./src/app');
 const { setupSupportSocket } = require('./src/socket/supportSocket');
 const { validateEnvironment } = require('./src/config/envValidation');
 const { scheduleWeeklyMarketingEmails } = require('./src/services/marketingEmailService');
+const { ensureAllProductSlugs } = require('./src/services/productSlugService');
+const { runMigrations } = require('./src/services/migrationService');
 
 const DEFAULT_PORT = Number(process.env.PORT || 5000);
 const MAX_PORT_RETRIES = Number(process.env.PORT_RETRY_COUNT || 20);
@@ -41,6 +43,23 @@ const startListeningWithRetry = (server, preferredPort, retries) => new Promise(
   tryListen(preferredPort, retries);
 });
 
+const isMissingProductSlugColumnError = (error) => {
+  const errors = [error, error?.parent, error?.original].filter(Boolean);
+  return errors.some((entry) => {
+    const code = String(entry.code || '');
+    const sqlMessage = String(entry.sqlMessage || entry.message || '').toLowerCase();
+    const sql = String(entry.sql || '').toLowerCase();
+    return (
+      code === 'ER_BAD_FIELD_ERROR'
+      && (
+        sqlMessage.includes("unknown column 'slug'")
+        || (sqlMessage.includes('unknown column') && sqlMessage.includes('slug'))
+        || sql.includes('`slug`')
+      )
+    );
+  });
+};
+
 const startServer = async () => {
   let server;
   try {
@@ -48,6 +67,19 @@ const startServer = async () => {
     const allowStartWithoutDb = String(process.env.ALLOW_START_WITHOUT_DB || '').toLowerCase() === 'true';
     try {
       await initializeDatabase();
+      let slugResult;
+      try {
+        slugResult = await ensureAllProductSlugs();
+      } catch (slugErr) {
+        if (!isMissingProductSlugColumnError(slugErr)) throw slugErr;
+        console.warn('[product-slug] Missing products.slug column detected. Running migrations and retrying.');
+        await runMigrations();
+        slugResult = await ensureAllProductSlugs();
+      }
+      const { updated } = slugResult;
+      if (updated > 0) {
+        console.log(`[product-slug] Backfilled ${updated} product slug(s).`);
+      }
       scheduleWeeklyMarketingEmails();
     } catch (dbErr) {
       if (!allowStartWithoutDb) throw dbErr;

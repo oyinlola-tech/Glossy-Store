@@ -62,9 +62,12 @@ const sendPaymentReceiptEmail = async ({ email, name, amount, currency, status, 
   return sendEmail({ to: email, subject, html });
 };
 
-const sendWeeklyMarketingEmail = async ({ email, products }) => {
-  const subject = `${process.env.BRAND_NAME || 'Glossy Store'} weekly product highlights`;
-  const html = renderWeeklyMarketingTemplate({ products });
+const sendWeeklyMarketingEmail = async ({ email, userName, products, campaign }) => {
+  const brand = process.env.BRAND_NAME || 'Glossy Store';
+  const productCount = Array.isArray(products) ? products.length : 0;
+  const subjectPrefix = campaign?.promoCode ? 'This week only' : 'Fresh this week';
+  const subject = `${subjectPrefix}: ${productCount} picks from ${brand}`;
+  const html = renderWeeklyMarketingTemplate({ userName, products, campaign });
   return sendEmail({ to: email, subject, html });
 };
 

@@ -1,5 +1,6 @@
 const { Product, Category, ProductImage, ProductColor, ProductSize, ProductVariant, Rating, Comment, FlashSale, User, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const { ensureProductSlug } = require('../services/productSlugService');
 const {
   productIdentifierParamSchema,
   productQuerySchema,
@@ -103,16 +104,17 @@ exports.getProducts = async (req, res, next) => {
       distinct: true,
     });
 
-    const mappedProducts = products.rows
-      .map((product) => {
-        const productJson = product.toJSON();
-        const flashDiscountPrice = flashSale === true ? resolveFlashDiscountPrice(productJson) : null;
-        return {
-          ...productJson,
-          ...formatPricing(product, { flashDiscountPrice }),
-          ...formatAvailability(product),
-        };
-      })
+    const mappedProducts = (await Promise.all(products.rows.map(async (product) => {
+      const slug = await ensureProductSlug(product);
+      const productJson = product.toJSON();
+      const flashDiscountPrice = flashSale === true ? resolveFlashDiscountPrice(productJson) : null;
+      return {
+        ...productJson,
+        slug,
+        ...formatPricing(product, { flashDiscountPrice }),
+        ...formatAvailability(product),
+      };
+    })))
       .filter((product) => (flashSale === true ? Number(product.current_price) < Number(product.original_price || 0) : true));
 
     res.json({
@@ -139,8 +141,10 @@ exports.getProduct = async (req, res, next) => {
       { model: Comment, include: [{ model: User, attributes: ['id', 'name'] }] },
     ]);
     if (!product) return res.status(404).json({ error: 'Product not found' });
+    const slug = await ensureProductSlug(product);
     res.json({
       ...product.toJSON(),
+      slug,
       ...formatPricing(product),
       ...formatAvailability(product),
     });

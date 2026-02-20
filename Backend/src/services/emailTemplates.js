@@ -22,34 +22,37 @@ const baseTemplate = ({ title, preheader, contentHtml, ctaLabel, ctaUrl }) => {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${title}</title>
+    <title>${escapeHtml(title)}</title>
   </head>
-  <body style="margin:0;padding:0;background:#f6f1eb;font-family:Segoe UI,Arial,sans-serif;color:#1f2430;">
-    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</div>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:28px 12px;">
+  <body style="margin:0;padding:0;background:${t.accentSecondary};font-family:Segoe UI,Arial,sans-serif;color:${t.accentSecondary};">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 12px;background:${t.accentSecondary};">
       <tr>
         <td align="center">
-          <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #eadfce;box-shadow:0 18px 40px rgba(31,36,48,0.15);">
+          <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;background:${t.accentTertiary};border:2px solid ${t.accentTertiary};">
             <tr>
-              <td style="padding:28px;background:linear-gradient(135deg, ${t.accentSecondary}, ${t.accentPrimary});color:#ffffff;">
-                <h1 style="margin:0;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:0.4px;">${t.brandName}</h1>
-                <p style="margin:8px 0 0 0;font-size:14px;opacity:0.95;">Luxury Shopping. Hardened Security.</p>
+              <td style="padding:24px;background:${t.accentSecondary};">
+                <h1 style="margin:0;color:${t.accentTertiary};font-size:26px;line-height:1.2;font-weight:700;">${escapeHtml(t.brandName)}</h1>
               </td>
             </tr>
             <tr>
-              <td style="padding:30px 32px 8px 32px;">${contentHtml}</td>
+              <td style="padding:24px;border-top:4px solid ${t.accentPrimary};">
+                ${contentHtml}
+              </td>
             </tr>
             ${ctaLabel && ctaUrl ? `
+              <tr>
+                <td style="padding:0 24px 24px 24px;">
+                  <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;background:${t.accentPrimary};color:${t.accentTertiary};text-decoration:none;padding:12px 18px;font-size:14px;font-weight:700;">${escapeHtml(ctaLabel)}</a>
+                </td>
+              </tr>
+            ` : ''}
             <tr>
-              <td style="padding:8px 32px 24px 32px;">
-                <a href="${ctaUrl}" style="display:inline-block;background:${t.accentPrimary};color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:999px;font-size:14px;font-weight:600;">${ctaLabel}</a>
-              </td>
-            </tr>` : ''}
-            <tr>
-              <td style="padding:18px 32px 28px 32px;background:#faf7f2;border-top:1px solid #f0e6d6;">
-                <p style="margin:0;font-size:12px;color:#5b6370;line-height:1.6;">
-                  Need help? Contact us at <a href="mailto:${t.supportEmail}" style="color:${t.accentSecondary};text-decoration:none;">${t.supportEmail}</a><br/>
-                  &copy; ${new Date().getFullYear()} ${t.brandName}. All rights reserved.
+              <td style="padding:16px 24px;background:${t.accentSecondary};border-top:2px solid ${t.accentTertiary};">
+                <p style="margin:0;color:${t.accentTertiary};font-size:12px;line-height:1.6;">
+                  Need help? Contact us at
+                  <a href="mailto:${escapeHtml(t.supportEmail)}" style="color:${t.accentTertiary};text-decoration:underline;">${escapeHtml(t.supportEmail)}</a><br/>
+                  &copy; ${new Date().getFullYear()} ${escapeHtml(t.brandName)}
                 </p>
               </td>
             </tr>
@@ -71,25 +74,22 @@ const otpPurposeText = {
 const renderOtpTemplate = ({ otp, purpose }) => {
   const t = getBrandTokens();
   const action = otpPurposeText[purpose] || 'Confirm your secure action';
-  const adminHint = purpose === 'login'
-    ? '<p style="margin:14px 0 0 0;font-size:13px;color:#5b6370;line-height:1.6;">Administrative access always requires OTP verification.</p>'
-    : '';
 
   return baseTemplate({
     title: `${t.brandName} Security Code`,
     preheader: `${action} with this one-time verification code.`,
     contentHtml: `
-      <h2 style="margin:0 0 12px 0;font-size:24px;color:#141926;">${action}</h2>
-      <p style="margin:0 0 16px 0;font-size:15px;color:#3b4352;line-height:1.7;">
-        For your security, use the verification code below. This code expires in 10 minutes and can only be used once.
+      <h2 style="margin:0 0 12px 0;color:${t.accentSecondary};font-size:24px;">${escapeHtml(action)}</h2>
+      <p style="margin:0 0 14px 0;color:${t.accentSecondary};font-size:15px;line-height:1.7;">
+        Use the code below. It expires in 10 minutes and can only be used once.
       </p>
-      <div style="margin:18px 0 20px 0;padding:16px;background:#fff7e7;border:1px solid #f2dfba;border-radius:14px;text-align:center;">
-        <span style="font-size:34px;letter-spacing:9px;font-weight:700;color:${t.accentPrimary};">${otp}</span>
+      <div style="padding:16px;border:2px solid ${t.accentPrimary};background:${t.accentTertiary};text-align:center;margin:0 0 14px 0;">
+        <span style="font-size:32px;letter-spacing:8px;font-weight:700;color:${t.accentPrimary};">${escapeHtml(otp)}</span>
       </div>
-      <p style="margin:0 0 6px 0;font-size:13px;color:#5b6370;line-height:1.6;">
-        If you did not request this action, secure your account immediately by changing your password.
+      <p style="margin:0;color:${t.accentSecondary};font-size:13px;line-height:1.6;">
+        If you did not request this, secure your account immediately.
       </p>
-      ${adminHint}`,
+    `,
     ctaLabel: 'Open Glossy Store',
     ctaUrl: t.appUrl,
   });
@@ -101,13 +101,11 @@ const renderWelcomeTemplate = ({ name }) => {
     title: `Welcome to ${t.brandName}`,
     preheader: `Your ${t.brandName} account is now active.`,
     contentHtml: `
-      <h2 style="margin:0 0 12px 0;font-size:24px;color:#141926;">Welcome, ${escapeHtml(name || 'Valued Customer')}.</h2>
-      <p style="margin:0 0 12px 0;font-size:15px;color:#3b4352;line-height:1.7;">
-        Your account has been successfully verified. You can now shop curated collections, manage your wishlist, and track every order in real time.
+      <h2 style="margin:0 0 12px 0;color:${t.accentSecondary};font-size:24px;">Welcome, ${escapeHtml(name || 'Valued Customer')}.</h2>
+      <p style="margin:0;color:${t.accentSecondary};font-size:15px;line-height:1.7;">
+        Your account has been verified. Start exploring new arrivals and track every order in one place.
       </p>
-      <p style="margin:0;font-size:15px;color:#3b4352;line-height:1.7;">
-        We designed your experience to be elegant, secure, and effortless from cart to checkout.
-      </p>`,
+    `,
     ctaLabel: 'Start Shopping',
     ctaUrl: t.appUrl,
   });
@@ -119,16 +117,17 @@ const renderDeviceChangeTemplate = ({ ipAddress }) => {
     title: `${t.brandName} Security Alert`,
     preheader: 'A new device or network was detected on your account.',
     contentHtml: `
-      <h2 style="margin:0 0 12px 0;font-size:24px;color:#141926;">New login environment detected</h2>
-      <p style="margin:0 0 14px 0;font-size:15px;color:#3b4352;line-height:1.7;">
-        We detected a login attempt from a new IP address:
+      <h2 style="margin:0 0 12px 0;color:${t.accentSecondary};font-size:24px;">New login environment detected</h2>
+      <p style="margin:0 0 10px 0;color:${t.accentSecondary};font-size:15px;line-height:1.7;">
+        We detected a login attempt from this IP address:
       </p>
-      <p style="margin:0 0 18px 0;font-size:16px;color:${t.accentPrimary};font-weight:700;">${escapeHtml(ipAddress)}</p>
-      <p style="margin:0;font-size:14px;color:#5b6370;line-height:1.7;">
-        If this was you, continue with your OTP verification. If this was not you, reset your password immediately and contact support.
-      </p>`,
+      <p style="margin:0 0 14px 0;color:${t.accentPrimary};font-size:16px;font-weight:700;">${escapeHtml(ipAddress || '-')}</p>
+      <p style="margin:0;color:${t.accentSecondary};font-size:14px;line-height:1.7;">
+        If this was not you, reset your password and contact support.
+      </p>
+    `,
     ctaLabel: 'Secure Account',
-    ctaUrl: `${t.appUrl}/security`,
+    ctaUrl: t.appUrl,
   });
 };
 
@@ -138,13 +137,14 @@ const renderContactReplyTemplate = ({ name, reply }) => {
     title: `${t.brandName} Support Reply`,
     preheader: 'Our support team has replied to your message.',
     contentHtml: `
-      <h2 style="margin:0 0 12px 0;font-size:24px;color:#141926;">Hello ${escapeHtml(name || 'there')},</h2>
-      <p style="margin:0 0 12px 0;font-size:15px;color:#3b4352;line-height:1.7;">
-        Thank you for contacting ${t.brandName}. Our team has reviewed your message and provided the response below:
+      <h2 style="margin:0 0 12px 0;color:${t.accentSecondary};font-size:24px;">Hello ${escapeHtml(name || 'there')},</h2>
+      <p style="margin:0 0 12px 0;color:${t.accentSecondary};font-size:15px;line-height:1.7;">
+        Our team has reviewed your message and replied below:
       </p>
-      <div style="padding:16px 18px;background:#f8fbff;border:1px solid #d7e3f8;border-radius:14px;">
-        <p style="margin:0;font-size:14px;color:#243047;line-height:1.8;">${escapeHtml(reply)}</p>
-      </div>`,
+      <div style="padding:14px;border:2px solid ${t.accentTertiary};background:${t.accentTertiary};">
+        <p style="margin:0;color:${t.accentSecondary};font-size:14px;line-height:1.8;">${escapeHtml(reply || '')}</p>
+      </div>
+    `,
     ctaLabel: 'Visit Glossy Store',
     ctaUrl: t.appUrl,
   });
@@ -155,125 +155,124 @@ const formatPrice = (amount, currency = 'NGN') => {
   return `${currency} ${value.toFixed(2)}`;
 };
 
-const renderWeeklyMarketingTemplate = ({ products = [] }) => {
+const formatDateLabel = (input) => {
+  if (!input) return '';
+  const value = new Date(input);
+  if (Number.isNaN(value.getTime())) return '';
+  return value.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+};
+
+const renderWeeklyMarketingTemplate = ({ userName, products = [], campaign = {} }) => {
   const t = getBrandTokens();
   const currency = process.env.BRAND_CURRENCY || 'NGN';
   const safeProducts = Array.isArray(products) ? products.slice(0, 12) : [];
+  const firstName = String(userName || '').trim().split(/\s+/)[0] || 'there';
+  const promoEnds = formatDateLabel(campaign?.promoEndsAt);
+  const hero = safeProducts[0] || null;
+
   const itemsHtml = safeProducts.map((product, index) => {
     const name = escapeHtml(product?.name || 'Product');
     const url = escapeHtml(product?.url || t.appUrl);
-    const price = formatPrice(product?.price, currency);
+    const price = escapeHtml(formatPrice(product?.price, currency));
+    const anchor = Number(product?.originalPrice || 0);
+    const current = Number(product?.price || 0);
+    const showAnchor = anchor > current;
+    const badge = escapeHtml(product?.badge || 'New this week');
+    const rating = Number(product?.averageRating || 0);
+    const reviewText = rating > 0 ? `${rating.toFixed(1)}/5 rated` : 'Trending pick';
+    const stock = Number(product?.stock || 0);
+    const stockText = stock > 0 && stock <= 5 ? `Only ${stock} left` : reviewText;
+
     return `
       <tr>
-        <td style="padding:14px 0;border-bottom:1px solid ${t.accentSecondary};">
+        <td style="padding:12px;border:1px solid ${t.accentTertiary};">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
             <tr>
-              <td style="font-size:14px;color:${t.accentSecondary};width:30px;">${index + 1}.</td>
-              <td style="font-size:15px;color:${t.accentSecondary};font-weight:600;line-height:1.5;">
-                <a href="${url}" style="color:${t.accentSecondary};text-decoration:none;">${name}</a>
-              </td>
-              <td style="font-size:15px;color:${t.accentPrimary};font-weight:700;text-align:right;white-space:nowrap;">${price}</td>
-            </tr>
-            <tr>
-              <td></td>
-              <td colspan="2" style="padding-top:6px;">
-                <a href="${url}" style="display:inline-block;padding:7px 12px;background:${t.accentPrimary};color:#ffffff;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;">View Product</a>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>`;
-  }).join('');
-
-  return `
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${t.brandName} Weekly Picks</title>
-  </head>
-  <body style="margin:0;padding:0;background:#ffffff;font-family:Segoe UI,Arial,sans-serif;color:${t.accentSecondary};">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 12px;background:#ffffff;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:2px solid ${t.accentSecondary};">
-            <tr>
-              <td style="padding:20px 24px;background:${t.accentSecondary};">
-                <h1 style="margin:0;font-size:26px;line-height:1.2;color:#ffffff;">${t.brandName}</h1>
-                <p style="margin:8px 0 0 0;font-size:13px;color:#ffffff;">Weekly product highlights</p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:22px 24px 10px 24px;">
-                <h2 style="margin:0 0 10px 0;font-size:22px;color:${t.accentSecondary};">Latest 12 Products</h2>
-                <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:${t.accentSecondary};">
-                  Discover what is new this week. Each product below links directly to its page.
+              <td style="width:26px;color:${t.accentSecondary};font-size:13px;font-weight:700;vertical-align:top;padding-top:4px;">${index + 1}.</td>
+              <td style="color:${t.accentSecondary};font-size:14px;line-height:1.5;vertical-align:top;">
+                <p style="margin:0 0 6px 0;">
+                  <span style="display:inline-block;background:${t.accentTertiary};color:${t.accentSecondary};padding:2px 8px;font-size:11px;font-weight:700;">${badge}</span>
                 </p>
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                  ${itemsHtml || '<tr><td style="font-size:14px;color:' + t.accentSecondary + ';">No products available right now.</td></tr>'}
-                </table>
+                <a href="${url}" style="color:${t.accentSecondary};text-decoration:none;font-weight:700;">${name}</a><br/>
+                <span style="color:${t.accentPrimary};font-weight:700;">${price}</span>
+                ${showAnchor ? `<span style="color:${t.accentSecondary};font-size:12px;padding-left:6px;text-decoration:line-through;">${escapeHtml(formatPrice(anchor, currency))}</span>` : ''}
+                <p style="margin:6px 0 0 0;color:${t.accentSecondary};font-size:12px;">${escapeHtml(stockText)}</p>
               </td>
-            </tr>
-            <tr>
-              <td style="padding:14px 24px 22px 24px;background:${t.accentSecondary};">
-                <a href="${escapeHtml(t.appUrl)}" style="display:inline-block;padding:10px 16px;background:${t.accentPrimary};color:#ffffff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:700;">Shop All Products</a>
-                <p style="margin:12px 0 0 0;font-size:12px;line-height:1.6;color:#ffffff;">
-                  ${t.brandName} | ${new Date().getFullYear()}
-                </p>
+              <td style="text-align:right;vertical-align:top;">
+                <a href="${url}" style="display:inline-block;padding:8px 12px;background:${t.accentPrimary};color:${t.accentTertiary};text-decoration:none;font-size:12px;font-weight:700;">Buy Now</a>
               </td>
             </tr>
           </table>
         </td>
       </tr>
-    </table>
-  </body>
-  </html>`;
-};
+    `;
+  }).join('');
 
-const renderPaymentReceiptTemplate = ({ name, email, amount, currency, status, reference, eventLabel, occurredAt }) => {
-  const t = templateVars();
-  const safeName = name || 'Customer';
-  const dateText = occurredAt ? new Date(occurredAt).toLocaleString() : new Date().toLocaleString();
-  const displayAmount = typeof amount === 'number' ? amount.toFixed(2) : amount;
-  return wrapTemplate({
-    ...t,
-    title: `${t.brandName} Payment Receipt`,
-    preheader: `Payment ${status} for ${t.brandName}`,
-    body: `
-      <h2 style="margin:0 0 12px 0;color:${t.textPrimary};">Hello ${safeName},</h2>
-      <p style="margin:0 0 14px 0;color:${t.textSecondary};line-height:1.6;">
-        We received a payment event from Squad. Here are the details:
+  return baseTemplate({
+    title: `${t.brandName} Weekly High-Converting Picks`,
+    preheader: 'Handpicked products with clear value and direct checkout links.',
+    contentHtml: `
+      <h2 style="margin:0 0 8px 0;color:${t.accentSecondary};font-size:22px;">Hi ${escapeHtml(firstName)}, your weekly picks are in.</h2>
+      <p style="margin:0 0 12px 0;color:${t.accentSecondary};font-size:14px;line-height:1.7;">
+        We selected high-performing items based on demand, ratings, and stock movement so you can find the best deals quickly.
       </p>
-      <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+      ${campaign?.promoCode ? `
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 14px 0;border:2px solid ${t.accentPrimary};">
         <tr>
-          <td style="padding:8px 0;color:${t.textSecondary};">Event</td>
-          <td style="padding:8px 0;color:${t.textPrimary};font-weight:600;">${eventLabel}</td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0;color:${t.textSecondary};">Status</td>
-          <td style="padding:8px 0;color:${t.textPrimary};font-weight:600;">${status}</td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0;color:${t.textSecondary};">Amount</td>
-          <td style="padding:8px 0;color:${t.textPrimary};font-weight:600;">${currency} ${displayAmount}</td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0;color:${t.textSecondary};">Reference</td>
-          <td style="padding:8px 0;color:${t.textPrimary};font-weight:600;">${reference || '-'}</td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0;color:${t.textSecondary};">Date</td>
-          <td style="padding:8px 0;color:${t.textPrimary};font-weight:600;">${dateText}</td>
+          <td style="padding:12px;background:${t.accentTertiary};color:${t.accentSecondary};font-size:13px;line-height:1.6;">
+            <strong>Weekly offer:</strong> Use code <strong>${escapeHtml(campaign.promoCode)}</strong>
+            ${promoEnds ? ` before <strong>${escapeHtml(promoEnds)}</strong>` : ''}.
+          </td>
         </tr>
       </table>
-      <p style="margin:0 0 8px 0;color:${t.textSecondary};line-height:1.6;">
-        If you have questions, reply to this email or contact ${t.supportEmail}.
-      </p>
-      <p style="margin:0;color:${t.textSecondary};line-height:1.6;">
-        Thanks for shopping with ${t.brandName}.
-      </p>
+      ` : ''}
+      ${hero ? `
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 14px 0;border:2px solid ${t.accentTertiary};">
+        <tr>
+          <td style="padding:12px;">
+            <p style="margin:0 0 6px 0;color:${t.accentSecondary};font-size:12px;font-weight:700;">SPOTLIGHT PICK</p>
+            <p style="margin:0 0 6px 0;color:${t.accentSecondary};font-size:18px;font-weight:700;">${escapeHtml(hero.name || 'Featured product')}</p>
+            <p style="margin:0 0 10px 0;color:${t.accentPrimary};font-size:16px;font-weight:700;">${escapeHtml(formatPrice(hero.price, currency))}</p>
+            <a href="${escapeHtml(hero.url || t.appUrl)}" style="display:inline-block;background:${t.accentPrimary};color:${t.accentTertiary};text-decoration:none;padding:10px 14px;font-size:12px;font-weight:700;">
+              Shop Spotlight
+            </a>
+          </td>
+        </tr>
+      </table>
+      ` : ''}
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:separate;border-spacing:0 10px;">
+        ${itemsHtml || `<tr><td style="color:${t.accentSecondary};font-size:14px;">No products available right now.</td></tr>`}
+      </table>
     `,
+    ctaLabel: 'See All Products',
+    ctaUrl: campaign?.ctaUrl || t.appUrl,
+  });
+};
+
+const renderPaymentReceiptTemplate = ({ name, amount, currency, status, reference, eventLabel, occurredAt }) => {
+  const t = getBrandTokens();
+  const safeName = escapeHtml(name || 'Customer');
+  const dateText = escapeHtml(occurredAt ? new Date(occurredAt).toLocaleString() : new Date().toLocaleString());
+  const displayAmount = Number.isFinite(Number(amount)) ? Number(amount).toFixed(2) : escapeHtml(amount || '0.00');
+
+  return baseTemplate({
+    title: `${t.brandName} Payment Receipt`,
+    preheader: `Payment ${escapeHtml(status || 'update')} for ${t.brandName}`,
+    contentHtml: `
+      <h2 style="margin:0 0 12px 0;color:${t.accentSecondary};font-size:24px;">Hello ${safeName},</h2>
+      <p style="margin:0 0 12px 0;color:${t.accentSecondary};font-size:15px;line-height:1.7;">
+        We received a payment event. Details are below.
+      </p>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:2px solid ${t.accentTertiary};">
+        <tr><td style="padding:10px;color:${t.accentSecondary};font-size:14px;">Event</td><td style="padding:10px;color:${t.accentSecondary};font-size:14px;font-weight:700;">${escapeHtml(eventLabel || '-')}</td></tr>
+        <tr><td style="padding:10px;color:${t.accentSecondary};font-size:14px;">Status</td><td style="padding:10px;color:${t.accentSecondary};font-size:14px;font-weight:700;">${escapeHtml(status || '-')}</td></tr>
+        <tr><td style="padding:10px;color:${t.accentSecondary};font-size:14px;">Amount</td><td style="padding:10px;color:${t.accentSecondary};font-size:14px;font-weight:700;">${escapeHtml(currency || 'NGN')} ${displayAmount}</td></tr>
+        <tr><td style="padding:10px;color:${t.accentSecondary};font-size:14px;">Reference</td><td style="padding:10px;color:${t.accentSecondary};font-size:14px;font-weight:700;">${escapeHtml(reference || '-')}</td></tr>
+        <tr><td style="padding:10px;color:${t.accentSecondary};font-size:14px;">Date</td><td style="padding:10px;color:${t.accentSecondary};font-size:14px;font-weight:700;">${dateText}</td></tr>
+      </table>
+    `,
+    ctaLabel: 'Open Glossy Store',
+    ctaUrl: t.appUrl,
   });
 };
 
