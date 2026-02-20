@@ -4,18 +4,50 @@ import { Package, Users, ShoppingCart, DollarSign, TrendingUp } from 'lucide-rea
 import * as api from '../../services/api';
 import { formatCurrency } from '../../utils/currency';
 
+const getLiveSalesInfo = (sales: api.FlashSale[], nowMs: number) => {
+  const liveSales = sales.filter((sale) => {
+    const start = new Date(sale.start_time).getTime();
+    const end = new Date(sale.end_time).getTime();
+    return !Number.isNaN(start) && !Number.isNaN(end) && start <= nowMs && nowMs <= end;
+  });
+  const quickestEndMs = liveSales.reduce<number | null>((minMs, sale) => {
+    const end = new Date(sale.end_time).getTime();
+    if (Number.isNaN(end)) return minMs;
+    if (minMs === null || end < minMs) return end;
+    return minMs;
+  }, null);
+  return { liveCount: liveSales.length, quickestEndMs };
+};
+
+const formatCountdown = (remainingMs: number) => {
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return '00:00:00';
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+};
+
 export function AdminDashboard() {
   const [summary, setSummary] = useState<any>(null);
+  const [flashSales, setFlashSales] = useState<api.FlashSale[]>([]);
+  const [nowMs, setNowMs] = useState(Date.now());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadSummary();
+    void loadSummary();
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const loadSummary = async () => {
     try {
-      const data = await api.getAdminDashboardSummary();
+      const [data, flashSalesData] = await Promise.all([
+        api.getAdminDashboardSummary(),
+        api.getFlashSales(),
+      ]);
       setSummary(data);
+      setFlashSales(Array.isArray(flashSalesData) ? flashSalesData : []);
     } catch (error) {
       console.error('Error loading dashboard summary:', error);
       setSummary({
@@ -24,10 +56,14 @@ export function AdminDashboard() {
         users: 0,
         pending_support_messages: 0,
       });
+      setFlashSales([]);
     } finally {
       setLoading(false);
     }
   };
+
+  const { liveCount, quickestEndMs } = getLiveSalesInfo(flashSales, nowMs);
+  const quickestTimer = quickestEndMs ? formatCountdown(Math.max(0, quickestEndMs - nowMs)) : null;
 
   if (loading) {
     return (
@@ -111,6 +147,17 @@ export function AdminDashboard() {
             <DollarSign className="size-12 text-red-500 mb-4" />
             <h3 className="text-xl font-semibold text-black dark:text-white mb-2">Payment Events</h3>
             <p className="text-gray-600 dark:text-gray-400 text-sm">View Paystack activity</p>
+          </Link>
+
+          <Link
+            to="/admin/flash-sales"
+            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
+          >
+            <TrendingUp className="size-12 text-red-500 mb-4" />
+            <h3 className="text-xl font-semibold text-black dark:text-white mb-2">Flash Sales</h3>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">
+              Live now: {liveCount} {quickestTimer ? `• Quickest ends in ${quickestTimer}` : '• No live sale'}
+            </p>
           </Link>
         </div>
 

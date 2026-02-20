@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { Facebook, Instagram, Linkedin, Send, Twitter } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
 
 export function Footer() {
   const [email, setEmail] = useState('');
   const socialBaseUrl = 'https://oyinlola.site';
+  const { user } = useAuth();
 
   const subscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +56,7 @@ export function Footer() {
             <h3 className="text-xl font-semibold">Account</h3>
             <div className="space-y-2 text-sm">
               <Link to="/account" className="block hover:underline">My Account</Link>
-              <Link to="/login" className="block hover:underline">Login / Register</Link>
+              {!user ? <Link to="/login" className="block hover:underline">Login / Register</Link> : null}
               <Link to="/cart" className="block hover:underline">Cart</Link>
               <Link to="/wishlist" className="block hover:underline">Wishlist</Link>
               <Link to="/products" className="block hover:underline">Shop</Link>

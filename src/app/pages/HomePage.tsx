@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import * as api from '../services/api';
 import { formatCurrency } from '../utils/currency';
+import { VariantPickerModal } from '../components/VariantPickerModal';
 
 const toPrice = (product: api.Product) =>
   Number(product.current_price ?? product.base_price ?? 0);
@@ -43,12 +44,34 @@ const discountSticker = (product: api.Product) => {
   return percent > 0 ? `-${percent}%` : null;
 };
 
+const getProductFlashRemainingMs = (product: api.Product, nowMs: number) => {
+  const sales = Array.isArray(product.FlashSales) ? product.FlashSales : [];
+  const activeEndTimes = sales
+    .map((sale) => new Date(String(sale.end_time || '')).getTime())
+    .filter((endMs) => Number.isFinite(endMs) && endMs >= nowMs);
+  if (!activeEndTimes.length) return null;
+  const earliestEnd = Math.min(...activeEndTimes);
+  return Math.max(0, earliestEnd - nowMs);
+};
+
+const formatCountdown = (remainingMs: number) => {
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return '00:00:00';
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+};
+
 export function HomePage() {
   const [products, setProducts] = useState<api.Product[]>([]);
   const [flashSaleProducts, setFlashSaleProducts] = useState<api.Product[]>([]);
   const [categories, setCategories] = useState<api.Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [trendingProducts, setTrendingProducts] = useState<api.Product[]>([]);
+  const [nowMs, setNowMs] = useState(Date.now());
+  const [wishlistIds, setWishlistIds] = useState<Set<number>>(new Set());
+  const [variantModalProduct, setVariantModalProduct] = useState<api.Product | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -87,9 +110,77 @@ export function HomePage() {
     return () => window.clearInterval(interval);
   }, [products]);
 
+  useEffect(() => {
+    const loadWishlist = async () => {
+      if (!user) {
+        setWishlistIds(new Set());
+        return;
+      }
+      try {
+        const data = await api.getUserWishlist();
+        const ids = new Set<number>(
+          (Array.isArray(data) ? data : [])
+            .map((entry: any) => Number(entry?.product_id || entry?.Product?.id))
+            .filter((id: number) => Number.isFinite(id) && id > 0)
+        );
+        setWishlistIds(ids);
+      } catch {
+        setWishlistIds(new Set());
+      }
+    };
+    void loadWishlist();
+  }, [user]);
+
+  const toggleWishlist = async (productId: number) => {
+    if (!user) {
+      toast.error('Please login to use wishlist');
+      navigate('/login');
+      return;
+    }
+    try {
+      if (wishlistIds.has(productId)) {
+        await api.removeFromWishlist(productId);
+        setWishlistIds((prev) => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+        toast.success('Removed from wishlist');
+      } else {
+        await api.addToWishlist(productId);
+        setWishlistIds((prev) => new Set(prev).add(productId));
+        toast.success('Added to wishlist');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update wishlist');
+    }
+  };
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const topProducts = useMemo(() => products.slice(0, 8), [products]);
 
   const addProductToCart = async (product: api.Product) => {
+    const variants = product.ProductVariants || [];
+    const colorCount = new Set(
+      variants
+        .map((variant) => variant.ProductColor?.name || variant.ProductColor?.color_name || null)
+        .filter(Boolean)
+    ).size;
+    const sizeCount = new Set(
+      variants
+        .map((variant) => variant.ProductSize?.size || null)
+        .filter(Boolean)
+    ).size;
+    const requiresChoice = variants.length > 0 && (colorCount > 1 || sizeCount > 1);
+    if (requiresChoice) {
+      setVariantModalProduct(product);
+      return;
+    }
+
     const variant = product.ProductVariants?.find((entry) => Number(entry.stock) > 0);
     const hasProductStock = Number((product as any).stock || 0) > 0;
     if (!variant && !hasProductStock) {
@@ -125,6 +216,36 @@ export function HomePage() {
       );
       toast.success('Added to cart');
       window.dispatchEvent(new Event('cart:updated'));
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to add to cart');
+    }
+  };
+
+  const addSelectedVariantToCart = async (product: api.Product, variant: NonNullable<api.Product['ProductVariants']>[number]) => {
+    try {
+      if (!user) {
+        const unitPrice = Number(product.base_price ?? 0) + Number(variant.price_adjustment || 0);
+        const color = variant?.ProductColor?.name || variant?.ProductColor?.color_name;
+        const size = variant?.ProductSize?.size;
+        const variantLabel = [color, size].filter(Boolean).join(' / ');
+        addToLocalCart({
+          id: variant.id,
+          productName: product.name,
+          unitPrice,
+          quantity: 1,
+          image: product.ProductImages?.[0]?.image_url || null,
+          variantLabel,
+          note: null,
+        });
+        toast.success('Added to cart');
+        setVariantModalProduct(null);
+        return;
+      }
+
+      await api.addToCart({ productVariantId: variant.id, quantity: 1 });
+      toast.success('Added to cart');
+      window.dispatchEvent(new Event('cart:updated'));
+      setVariantModalProduct(null);
     } catch (error: any) {
       toast.error(error.message || 'Failed to add to cart');
     }
@@ -212,7 +333,7 @@ export function HomePage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {flashSaleProducts.map((product) => (
-            <FeaturedImageCard key={product.id} product={product} />
+            <FeaturedImageCard key={product.id} product={product} nowMs={nowMs} />
           ))}
         </div>
       </section>
@@ -230,15 +351,40 @@ export function HomePage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {topProducts.map((product) => (
-            <ProductCard key={product.id} product={product} onAddToCart={addProductToCart} />
+            <ProductCard
+              key={product.id}
+              product={product}
+              onAddToCart={addProductToCart}
+              onToggleWishlist={() => void toggleWishlist(product.id)}
+              isWishlisted={wishlistIds.has(product.id)}
+            />
           ))}
         </div>
       </section>
+      <VariantPickerModal
+        open={Boolean(variantModalProduct)}
+        product={variantModalProduct}
+        onClose={() => setVariantModalProduct(null)}
+        onConfirm={(variant) => {
+          if (!variantModalProduct) return;
+          void addSelectedVariantToCart(variantModalProduct, variant);
+        }}
+      />
     </div>
   );
 }
 
-function ProductCard({ product, onAddToCart }: { product: api.Product; onAddToCart: (product: api.Product) => void }) {
+function ProductCard({
+  product,
+  onAddToCart,
+  onToggleWishlist,
+  isWishlisted,
+}: {
+  product: api.Product;
+  onAddToCart: (product: api.Product) => void;
+  onToggleWishlist: () => void;
+  isWishlisted: boolean;
+}) {
   const price = toPrice(product);
   const original = Number(product.original_price || 0);
   const sticker = discountSticker(product);
@@ -254,8 +400,8 @@ function ProductCard({ product, onAddToCart }: { product: api.Product; onAddToCa
           </span>
         ) : null}
         <div className="absolute top-2 right-2 flex flex-col gap-2">
-          <button className="bg-white dark:bg-gray-700 rounded-full p-2 hover:bg-red-500 hover:text-white transition-colors">
-            <Heart className="size-4" />
+          <button onClick={onToggleWishlist} className="bg-white dark:bg-gray-700 rounded-full p-2 hover:bg-red-500 hover:text-white transition-colors">
+            <Heart className={`size-4 ${isWishlisted ? 'fill-red-500 text-red-500' : ''}`} />
           </button>
           <Link to={api.getProductPath(product)} className="bg-white dark:bg-gray-700 rounded-full p-2 hover:bg-red-500 hover:text-white transition-colors">
             <Eye className="size-4" />
@@ -284,14 +430,15 @@ function ProductCard({ product, onAddToCart }: { product: api.Product; onAddToCa
   );
 }
 
-function FeaturedImageCard({ product }: { product: api.Product }) {
+function FeaturedImageCard({ product, nowMs }: { product: api.Product; nowMs: number }) {
   const image = product.ProductImages?.[0]?.image_url || `https://source.unsplash.com/400x400/?product,${encodeURIComponent(product.name)}`;
   const currentPrice = Number(product.current_price ?? product.base_price ?? 0);
   const originalPrice = Number(product.original_price || 0);
   const sticker = discountSticker(product);
+  const remainingMs = getProductFlashRemainingMs(product, nowMs);
 
   return (
-    <Link to={api.getProductPath(product)} className="group block">
+    <Link to={api.getFlashSaleProductPath(product)} className="group block">
       <div className="aspect-square bg-gray-100 dark:bg-gray-800 rounded overflow-hidden relative mb-3">
         {sticker ? (
           <span className="absolute top-2 left-2 z-10 bg-red-500 text-white text-xs px-2 py-1 rounded">
@@ -303,6 +450,11 @@ function FeaturedImageCard({ product }: { product: api.Product }) {
           alt={product.name}
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
+        {remainingMs !== null ? (
+          <span className="absolute bottom-2 left-2 z-10 bg-black/75 text-white text-[11px] px-2 py-1 rounded">
+            Ends in {formatCountdown(remainingMs)}
+          </span>
+        ) : null}
       </div>
       <h4 className="font-semibold text-black dark:text-white mb-1 truncate group-hover:text-red-500">{product.name}</h4>
       {originalPrice > currentPrice ? (

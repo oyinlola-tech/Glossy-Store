@@ -41,17 +41,20 @@ export function ProductDetailPage() {
   const [rating, setRating] = useState(5);
   const [showAllComments, setShowAllComments] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [nowMs, setNowMs] = useState(Date.now());
+  const [isWishlisted, setIsWishlisted] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const isFlashSaleRoute = location.pathname.startsWith('/flash-sales/');
 
   useEffect(() => {
     const load = async () => {
       if (!slugOrId) return;
       try {
-        const data = await api.getProduct(slugOrId);
+        const data = await api.getProduct(slugOrId, { flashSale: isFlashSaleRoute });
         setProduct(data);
-        const canonicalPath = api.getProductPath(data);
+        const canonicalPath = isFlashSaleRoute ? api.getFlashSaleProductPath(data) : api.getProductPath(data);
         if (canonicalPath && canonicalPath !== location.pathname) {
           navigate(canonicalPath, { replace: true });
           return;
@@ -71,7 +74,34 @@ export function ProductDetailPage() {
       }
     };
     void load();
-  }, [location.pathname, navigate, slugOrId]);
+  }, [isFlashSaleRoute, location.pathname, navigate, slugOrId]);
+
+  useEffect(() => {
+    if (!isFlashSaleRoute) return undefined;
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [isFlashSaleRoute]);
+
+  useEffect(() => {
+    const loadWishlistState = async () => {
+      if (!user || !product?.id) {
+        setIsWishlisted(false);
+        return;
+      }
+      try {
+        const data = await api.getUserWishlist();
+        const ids = new Set<number>(
+          (Array.isArray(data) ? data : [])
+            .map((entry: any) => Number(entry?.product_id || entry?.Product?.id))
+            .filter((id: number) => Number.isFinite(id) && id > 0)
+        );
+        setIsWishlisted(ids.has(Number(product.id)));
+      } catch {
+        setIsWishlisted(false);
+      }
+    };
+    void loadWishlistState();
+  }, [user, product?.id]);
 
   const colorOptions = useMemo(() => {
     const entries = product?.ProductVariants || [];
@@ -115,6 +145,22 @@ export function ProductDetailPage() {
 
   const currentPrice = Number(product?.current_price ?? product?.base_price ?? 0);
   const originalPrice = Number(product?.original_price || 0);
+  const flashSales = Array.isArray(product?.FlashSales) ? product!.FlashSales! : [];
+  const activeFlashSales = flashSales.filter((sale) => {
+    const start = new Date(String(sale.start_time || '')).getTime();
+    const end = new Date(String(sale.end_time || '')).getTime();
+    return Number.isFinite(start) && Number.isFinite(end) && start <= nowMs && nowMs <= end;
+  });
+  const flashSaleEndsAtMs = activeFlashSales.reduce<number | null>((earliest, sale) => {
+    const end = new Date(String(sale.end_time || '')).getTime();
+    if (!Number.isFinite(end)) return earliest;
+    if (earliest === null || end < earliest) return end;
+    return earliest;
+  }, null);
+  const flashSaleRemainingMs = flashSaleEndsAtMs ? Math.max(0, flashSaleEndsAtMs - nowMs) : 0;
+  const flashSaleDiscountPercent = originalPrice > currentPrice && currentPrice > 0
+    ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
+    : null;
   const productImages = product?.ProductImages || [];
   const fallbackImage = `https://source.unsplash.com/600x600/?product,${encodeURIComponent(product?.name || 'item')}`;
   const image = productImages[selectedImageIndex]?.image_url || productImages[0]?.image_url || fallbackImage;
@@ -176,6 +222,28 @@ export function ProductDetailPage() {
       setComment('');
     } catch (error: any) {
       toast.error(error.message || 'Failed to submit review');
+    }
+  };
+
+  const toggleWishlist = async () => {
+    if (!product?.id) return;
+    if (!user) {
+      toast.error('Please login to use wishlist');
+      navigate('/login');
+      return;
+    }
+    try {
+      if (isWishlisted) {
+        await api.removeFromWishlist(product.id);
+        setIsWishlisted(false);
+        toast.success('Removed from wishlist');
+      } else {
+        await api.addToWishlist(product.id);
+        setIsWishlisted(true);
+        toast.success('Added to wishlist');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update wishlist');
     }
   };
 
@@ -246,6 +314,21 @@ export function ProductDetailPage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-black dark:text-white mb-4">{product.name}</h1>
+            {isFlashSaleRoute ? (
+              <div className="mb-4 rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-4 py-3">
+                <p className="text-sm font-semibold text-red-600 dark:text-red-400">Flash Sale Deal</p>
+                <p className="text-xs text-red-500 dark:text-red-300">
+                  {flashSaleDiscountPercent ? `Save ${flashSaleDiscountPercent}%` : 'Special flash-sale pricing is active.'}
+                  {flashSaleEndsAtMs ? ` Ends in ${Math.floor(flashSaleRemainingMs / 3600000)
+                    .toString()
+                    .padStart(2, '0')}:${Math.floor((flashSaleRemainingMs % 3600000) / 60000)
+                    .toString()
+                    .padStart(2, '0')}:${Math.floor((flashSaleRemainingMs % 60000) / 1000)
+                    .toString()
+                    .padStart(2, '0')}` : ''}
+                </p>
+              </div>
+            ) : null}
             <p className="text-gray-600 dark:text-gray-400 mb-6">{product.description || 'No product description yet.'}</p>
             <div className="flex items-center gap-3 mb-6">
               <span className="text-3xl font-bold text-red-500">{formatCurrency(currentPrice)}</span>
@@ -305,6 +388,9 @@ export function ProductDetailPage() {
               />
               <button onClick={addToCart} className="bg-red-500 text-white px-6 py-2 rounded hover:bg-red-600">
                 Add To Cart
+              </button>
+              <button onClick={toggleWishlist} className="px-6 py-2 rounded border border-gray-300 dark:border-gray-600 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800">
+                {isWishlisted ? 'Remove Wishlist' : 'Add Wishlist'}
               </button>
             </div>
             <textarea

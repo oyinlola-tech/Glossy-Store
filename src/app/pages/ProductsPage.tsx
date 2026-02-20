@@ -52,6 +52,7 @@ export function ProductsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [sortBy, setSortBy] = useState<SortOption>('featured');
   const [categories, setCategories] = useState<api.Category[]>([]);
+  const [wishlistIds, setWishlistIds] = useState<Set<number>>(new Set());
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -70,6 +71,27 @@ export function ProductsPage() {
     };
     void loadCategories();
   }, []);
+
+  useEffect(() => {
+    const loadWishlist = async () => {
+      if (!user) {
+        setWishlistIds(new Set());
+        return;
+      }
+      try {
+        const data = await api.getUserWishlist();
+        const ids = new Set<number>(
+          (Array.isArray(data) ? data : [])
+            .map((entry: any) => Number(entry?.product_id || entry?.Product?.id))
+            .filter((id: number) => Number.isFinite(id) && id > 0)
+        );
+        setWishlistIds(ids);
+      } catch {
+        setWishlistIds(new Set());
+      }
+    };
+    void loadWishlist();
+  }, [user]);
 
   const categoryOptions = useMemo(() => (
     categories.flatMap((category) => {
@@ -190,17 +212,28 @@ export function ProductsPage() {
     }
   };
 
-  const addProductToWishlist = async (productId: number) => {
+  const toggleProductWishlist = async (productId: number) => {
     if (!user) {
       toast.error('Please login to use wishlist');
       navigate('/login');
       return;
     }
     try {
-      await api.addToWishlist(productId);
-      toast.success('Added to wishlist');
+      if (wishlistIds.has(productId)) {
+        await api.removeFromWishlist(productId);
+        setWishlistIds((prev) => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+        toast.success('Removed from wishlist');
+      } else {
+        await api.addToWishlist(productId);
+        setWishlistIds((prev) => new Set(prev).add(productId));
+        toast.success('Added to wishlist');
+      }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to add to wishlist');
+      toast.error(error.message || 'Failed to update wishlist');
     }
   };
 
@@ -285,7 +318,8 @@ export function ProductsPage() {
                   key={product.id}
                   product={product}
                   onAddToCart={() => addProductToCart(product)}
-                  onAddToWishlist={() => addProductToWishlist(product.id)}
+                  onAddToWishlist={() => toggleProductWishlist(product.id)}
+                  isWishlisted={wishlistIds.has(product.id)}
                 />
               ))}
             </div>
@@ -322,10 +356,12 @@ function ProductCard({
   product,
   onAddToCart,
   onAddToWishlist,
+  isWishlisted,
 }: {
   product: api.Product;
   onAddToCart: () => void;
   onAddToWishlist: () => void;
+  isWishlisted: boolean;
 }) {
   const image = product.ProductImages?.[0]?.image_url || `https://source.unsplash.com/400x400/?product,${encodeURIComponent(product.name)}`;
   const price = priceOf(product);
@@ -343,7 +379,7 @@ function ProductCard({
         ) : null}
         <div className="absolute top-2 right-2 flex flex-col gap-2">
           <button onClick={onAddToWishlist} className="bg-white dark:bg-gray-700 rounded-full p-2 hover:bg-red-500 hover:text-white transition-colors">
-            <Heart className="size-4" />
+            <Heart className={`size-4 ${isWishlisted ? 'fill-red-500 text-red-500' : ''}`} />
           </button>
           <Link to={api.getProductPath(product)} className="bg-white dark:bg-gray-700 rounded-full p-2 hover:bg-red-500 hover:text-white transition-colors">
             <Eye className="size-4" />

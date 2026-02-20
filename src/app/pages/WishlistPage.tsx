@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import * as api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { VariantPickerModal } from '../components/VariantPickerModal';
 
 export function WishlistPage() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [variantModalProduct, setVariantModalProduct] = useState<api.Product | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -35,7 +37,25 @@ export function WishlistPage() {
   };
 
   const addToCart = async (product: any) => {
-    const variant = product?.Product?.ProductVariants?.find((entry: any) => Number(entry.stock) > 0);
+    const targetProduct = product?.Product as api.Product;
+    const variants = targetProduct?.ProductVariants || [];
+    const colorCount = new Set(
+      variants
+        .map((variant) => variant.ProductColor?.name || variant.ProductColor?.color_name || null)
+        .filter(Boolean)
+    ).size;
+    const sizeCount = new Set(
+      variants
+        .map((variant) => variant.ProductSize?.size || null)
+        .filter(Boolean)
+    ).size;
+    const requiresChoice = variants.length > 0 && (colorCount > 1 || sizeCount > 1);
+    if (requiresChoice) {
+      setVariantModalProduct(targetProduct);
+      return;
+    }
+
+    const variant = targetProduct?.ProductVariants?.find((entry: any) => Number(entry.stock) > 0);
     if (!variant) {
       toast.error('No purchasable variant for this product');
       return;
@@ -79,6 +99,49 @@ export function WishlistPage() {
     }
   };
 
+  const addSelectedVariantToCart = async (variant: NonNullable<api.Product['ProductVariants']>[number]) => {
+    if (!variantModalProduct) return;
+    try {
+      if (user) {
+        await api.addToCart({ productVariantId: variant.id, quantity: 1 });
+        toast.success('Added to cart');
+        navigate('/cart');
+        window.dispatchEvent(new Event('cart:updated'));
+        setVariantModalProduct(null);
+        return;
+      }
+
+      const raw = localStorage.getItem('cart');
+      const parsed = raw ? (JSON.parse(raw) as { items?: any[] }) : { items: [] };
+      const itemsRaw = Array.isArray(parsed.items) ? parsed.items : [];
+      const existing = itemsRaw.find((item) => Number(item.id) === Number(variant.id));
+      if (existing) {
+        existing.quantity = Number(existing.quantity || 1) + 1;
+      } else {
+        const unitPrice = Number(variantModalProduct.base_price ?? 0) + Number(variant.price_adjustment || 0);
+        const color = variant?.ProductColor?.name || variant?.ProductColor?.color_name;
+        const size = variant?.ProductSize?.size;
+        const variantLabel = [color, size].filter(Boolean).join(' / ');
+        itemsRaw.push({
+          id: variant.id,
+          productName: variantModalProduct.name || 'Product',
+          unitPrice,
+          quantity: 1,
+          image: variantModalProduct.ProductImages?.[0]?.image_url || null,
+          variantLabel,
+          note: null,
+        });
+      }
+      localStorage.setItem('cart', JSON.stringify({ items: itemsRaw }));
+      toast.success('Added to cart');
+      navigate('/cart');
+      window.dispatchEvent(new Event('cart:updated'));
+      setVariantModalProduct(null);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to add to cart');
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-16 text-center">
@@ -116,6 +179,12 @@ export function WishlistPage() {
           })}
         </div>
       )}
+      <VariantPickerModal
+        open={Boolean(variantModalProduct)}
+        product={variantModalProduct}
+        onClose={() => setVariantModalProduct(null)}
+        onConfirm={(variant) => void addSelectedVariantToCart(variant)}
+      />
     </div>
   );
 }

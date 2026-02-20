@@ -166,6 +166,13 @@ export type Product = {
   has_discount?: boolean;
   discount_label?: string | null;
   average_rating?: number;
+  FlashSales?: Array<{
+    id: number;
+    name?: string;
+    start_time?: string;
+    end_time?: string;
+    FlashSaleProduct?: { discount_price?: number | string };
+  }>;
   ProductImages?: Array<{ image_url: string }>;
   ProductVariants?: Array<{
     id: number;
@@ -179,6 +186,11 @@ export type Product = {
 export const getProductPath = (product?: Pick<Product, 'id' | 'slug'> | null) => {
   if (!product) return '/products';
   return `/products/${encodeURIComponent(String(product.slug || product.id))}`;
+};
+
+export const getFlashSaleProductPath = (product?: Pick<Product, 'id' | 'slug'> | null) => {
+  if (!product) return '/products';
+  return `/flash-sales/${encodeURIComponent(String(product.slug || product.id))}`;
 };
 
 export type Category = {
@@ -474,7 +486,11 @@ export const getProducts = (params?: {
   );
 };
 
-export const getProduct = (idOrSlug: number | string) => apiCall<Product>(`/products/${encodeURIComponent(String(idOrSlug))}`);
+export const getProduct = (idOrSlug: number | string, options?: { flashSale?: boolean }) => {
+  const search = new URLSearchParams();
+  if (options?.flashSale) search.set('flashSale', 'true');
+  return apiCall<Product>(`/products/${encodeURIComponent(String(idOrSlug))}${search.toString() ? `?${search.toString()}` : ''}`);
+};
 export const getCategories = (params?: { tree?: boolean }) => {
   const search = new URLSearchParams();
   if (typeof params?.tree === 'boolean') search.set('tree', String(params.tree));

@@ -24,6 +24,19 @@ export function CartPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const updateGuestLocalCart = (updater: (items: LocalCartItem[]) => LocalCartItem[]) => {
+    const localCart = localStorage.getItem('cart');
+    const parsed = localCart ? (JSON.parse(localCart) as { items?: LocalCartItem[] }) : { items: [] };
+    const current = Array.isArray(parsed.items) ? parsed.items : [];
+    const nextItems = updater(current).map((item) => ({
+      ...item,
+      quantity: Math.max(1, Number(item.quantity || 1)),
+      unitPrice: Number(item.unitPrice || 0),
+    }));
+    localStorage.setItem('cart', JSON.stringify({ items: nextItems }));
+    window.dispatchEvent(new Event('cart:updated'));
+  };
+
   useEffect(() => {
     void loadCart();
   }, [user]);
@@ -66,8 +79,11 @@ export function CartPage() {
   const updateQuantity = async (itemId: number, newQuantity: number) => {
     if (newQuantity < 1) return;
     if (!user) {
-      toast.error('Login is required to edit server cart');
-      navigate('/login');
+      updateGuestLocalCart((items) =>
+        items.map((item) => (Number(item.id) === Number(itemId) ? { ...item, quantity: newQuantity } : item))
+      );
+      await loadCart();
+      toast.success('Cart updated');
       return;
     }
 
@@ -83,8 +99,9 @@ export function CartPage() {
 
   const removeItem = async (itemId: number) => {
     if (!user) {
-      toast.error('Login is required to edit server cart');
-      navigate('/login');
+      updateGuestLocalCart((items) => items.filter((item) => Number(item.id) !== Number(itemId)));
+      await loadCart();
+      toast.success('Item removed from cart');
       return;
     }
 

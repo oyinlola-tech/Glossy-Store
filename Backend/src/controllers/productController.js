@@ -65,6 +65,15 @@ const findProductByIdentifier = async (identifier, include = []) => {
   });
 };
 
+const getActiveFlashSalesInclude = () => ({
+  model: FlashSale,
+  where: {
+    start_time: { [Op.lte]: new Date() },
+    end_time: { [Op.gte]: new Date() },
+  },
+  required: false,
+});
+
 exports.getProducts = async (req, res, next) => {
   try {
     const { error, value } = validateQuery(productQuerySchema, req.query);
@@ -83,14 +92,7 @@ exports.getProducts = async (req, res, next) => {
       { model: ProductVariant, include: [{ model: ProductColor }, { model: ProductSize }] },
     ];
     if (flashSale === true) {
-      include.push({
-        model: FlashSale,
-        where: {
-          start_time: { [Op.lte]: new Date() },
-          end_time: { [Op.gte]: new Date() },
-        },
-        required: true,
-      });
+      include.push({ ...getActiveFlashSalesInclude(), required: true });
     }
     if (newArrivals === true) {
       where.created_at = { [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
@@ -132,20 +134,30 @@ exports.getProduct = async (req, res, next) => {
   try {
     const paramValidation = validateParams(productIdentifierParamSchema, req.params);
     if (paramValidation.error) return res.status(400).json({ error: paramValidation.error.details[0].message });
-    const product = await findProductByIdentifier(paramValidation.value.idOrSlug, [
+    const includeFlashSale = ['1', 'true', 'yes', 'on'].includes(String(req.query.flashSale || '').toLowerCase());
+    const include = [
       { model: ProductImage },
       { model: ProductColor },
       { model: ProductSize },
       { model: ProductVariant, include: [{ model: ProductColor }, { model: ProductSize }] },
       { model: Rating, include: [{ model: User, attributes: ['id', 'name'] }] },
       { model: Comment, include: [{ model: User, attributes: ['id', 'name'] }] },
+    ];
+    if (includeFlashSale) {
+      include.push(getActiveFlashSalesInclude());
+    }
+
+    const product = await findProductByIdentifier(paramValidation.value.idOrSlug, [
+      ...include,
     ]);
     if (!product) return res.status(404).json({ error: 'Product not found' });
     const slug = await ensureProductSlug(product);
+    const productJson = product.toJSON();
+    const flashDiscountPrice = includeFlashSale ? resolveFlashDiscountPrice(productJson) : null;
     res.json({
-      ...product.toJSON(),
+      ...productJson,
       slug,
-      ...formatPricing(product),
+      ...formatPricing(product, { flashDiscountPrice }),
       ...formatAvailability(product),
     });
   } catch (err) {
