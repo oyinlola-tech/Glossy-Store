@@ -6,6 +6,7 @@ import * as api from '../services/api';
 export function PaymentVerifyPage() {
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<'pending' | 'success' | 'failed'>('pending');
+  const [attempt, setAttempt] = useState(0);
   const reference = searchParams.get('reference') || '';
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export function PaymentVerifyPage() {
       }
     };
     void verify();
-  }, [reference]);
+  }, [reference, attempt]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center px-4">
@@ -40,7 +41,21 @@ export function PaymentVerifyPage() {
         ) : status === 'success' ? (
           <p className="text-green-600 dark:text-green-300">Payment confirmed. Thank you!</p>
         ) : (
-          <p className="text-red-500">Payment could not be verified.</p>
+          <div className="space-y-3">
+            <p className="text-red-500">Payment could not be verified.</p>
+            {reference ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setStatus('pending');
+                  setAttempt((prev) => prev + 1);
+                }}
+                className="px-4 py-2 rounded bg-[#b42318] text-white hover:bg-[#8f1b12]"
+              >
+                Retry verification
+              </button>
+            ) : null}
+          </div>
         )}
         <div className="mt-4">
           <Link to="/orders" className="text-[#b42318] hover:underline">Go to Orders</Link>

@@ -88,7 +88,7 @@ app.use(cors({
   origin: corsOrigin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Authorization', 'Content-Type', 'X-Requested-With'],
+  allowedHeaders: ['Authorization', 'Content-Type', 'X-Requested-With', 'X-Guest-Token'],
 }));
 app.use(requestLogger);
 app.use(express.json({

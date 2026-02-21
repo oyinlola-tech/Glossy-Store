@@ -8,15 +8,18 @@ import { CartPage } from './pages/CartPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { ContactPage } from './pages/ContactPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { FaqPage } from './pages/FaqPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { OtpVerificationPage } from './pages/OtpVerificationPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { PaymentVerifyPage } from './pages/PaymentVerifyPage';
+import { PrivacyPage } from './pages/PrivacyPage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { TermsPage } from './pages/TermsPage';
 import { WishlistPage } from './pages/WishlistPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminCategoriesPage } from './pages/admin/AdminCategoriesPage';
@@ -172,17 +175,6 @@ function AboutPage() {
   );
 }
 
-function StaticInfoPage({ title, content }: { title: string; content: string }) {
-  return (
-    <MainLayout>
-      <div className="container mx-auto px-4 py-10">
-        <h1 className="text-3xl font-bold text-black dark:text-white mb-4">{title}</h1>
-        <p className="text-gray-700 dark:text-gray-300 max-w-3xl">{content}</p>
-      </div>
-    </MainLayout>
-  );
-}
-
 function NotFoundPage() {
   return (
     <MainLayout>
@@ -231,18 +223,9 @@ export const router = createBrowserRouter([
       },
       { path: 'contact', element: <MainLayout><ContactPage /></MainLayout> },
       { path: 'about', element: <AboutPage /> },
-      {
-        path: 'privacy',
-        element: <StaticInfoPage title="Privacy Policy" content="We process account and order data to deliver services securely. Contact support for privacy requests." />,
-      },
-      {
-        path: 'terms',
-        element: <StaticInfoPage title="Terms of Use" content="Using this platform means agreeing to applicable policies, lawful use, and payment/refund terms." />,
-      },
-      {
-        path: 'faq',
-        element: <StaticInfoPage title="FAQ" content="For product, shipping, payment, and account questions, contact support through the contact page." />,
-      },
+      { path: 'privacy', element: <MainLayout><PrivacyPage /></MainLayout> },
+      { path: 'terms', element: <MainLayout><TermsPage /></MainLayout> },
+      { path: 'faq', element: <MainLayout><FaqPage /></MainLayout> },
       {
         path: 'admin/dashboard',
         element: (

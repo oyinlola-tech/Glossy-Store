@@ -233,7 +233,7 @@ The application integrates with all endpoints documented in your API v2.0.5:
 
 For any issues or questions:
 - Email: exclusive@gmail.com
-- Phone: +88015-88888-9999
+- Phone: +234 913 351 9489
 - Use the Contact page for detailed inquiries
 - Admin users: Access support tickets in dashboard
 

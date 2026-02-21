@@ -3,12 +3,14 @@ import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
+import { buildApiUrl } from '../services/api';
 
 export function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -16,18 +18,18 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const isValidEmail = /\S+@\S+\.\S+/.test(email.trim());
   const isStrongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
-  const isFormValid = name.trim().length >= 2 && isValidEmail && isStrongPassword && password === confirmPassword;
+  const isFormValid = name.trim().length >= 2 && isValidEmail && isStrongPassword && password === confirmPassword && acceptedTerms;
   const startGoogleAuth = () => {
-    window.location.href = '/api/auth/google';
+    window.location.href = buildApiUrl('/auth/google');
   };
   const startAppleAuth = () => {
-    window.location.href = '/api/auth/apple';
+    window.location.href = buildApiUrl('/auth/apple');
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid) {
-      toast.error('Enter a valid name, email, and matching strong passwords');
+      toast.error('Complete all fields, use a strong password, and accept terms to continue');
       return;
     }
     setLoading(true);
@@ -148,6 +150,26 @@ export function RegisterPage() {
             {confirmPassword && password !== confirmPassword ? (
               <p className="text-xs text-[#b42318]">Passwords do not match.</p>
             ) : null}
+            <label className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-[#b42318] focus:ring-[#b42318]"
+                aria-label="Accept terms and conditions"
+              />
+              <span>
+                I agree to the{' '}
+                <Link to="/terms" className="text-[#b42318] hover:underline font-semibold">
+                  Terms of Use
+                </Link>{' '}
+                and{' '}
+                <Link to="/privacy" className="text-[#b42318] hover:underline font-semibold">
+                  Privacy Policy
+                </Link>
+                .
+              </span>
+            </label>
 
             <button
               type="submit"

@@ -4129,9 +4129,9 @@ function Frame170() {
 function Frame191() {
   return (
     <div className="content-stretch flex flex-col font-['Poppins:Regular',sans-serif] gap-[16px] items-start leading-[24px] relative shrink-0 text-[16px]">
-      <p className="relative shrink-0 w-[175px] whitespace-pre-wrap">{`111 Bijoy sarani, Dhaka,  DH 1515, Bangladesh.`}</p>
+      <p className="relative shrink-0 w-[175px] whitespace-pre-wrap">{`4 Sogbon Street, Igbotako,  Ondo State, Nigeria.`}</p>
       <p className="relative shrink-0">exclusive@gmail.com</p>
-      <p className="relative shrink-0">+88015-88888-9999</p>
+      <p className="relative shrink-0">+234 913 351 9489</p>
     </div>
   );
 }

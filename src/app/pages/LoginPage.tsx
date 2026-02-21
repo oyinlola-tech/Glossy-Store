@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
+import { buildApiUrl } from '../services/api';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -14,10 +15,10 @@ export function LoginPage() {
   const isValidEmail = /\S+@\S+\.\S+/.test(email.trim());
   const isFormValid = isValidEmail && password.trim().length >= 8;
   const startGoogleAuth = () => {
-    window.location.href = '/api/auth/google';
+    window.location.href = buildApiUrl('/auth/google');
   };
   const startAppleAuth = () => {
-    window.location.href = '/api/auth/apple';
+    window.location.href = buildApiUrl('/auth/apple');
   };
 
   const handleLogin = async (e: React.FormEvent) => {

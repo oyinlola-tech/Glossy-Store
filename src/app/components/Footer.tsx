@@ -46,9 +46,9 @@ export function Footer() {
           <div className="space-y-4">
             <h3 className="text-xl font-semibold">Support</h3>
             <div className="space-y-2 text-sm">
-              <p>111 Bijoy sarani, Dhaka,<br />DH 1515, Bangladesh.</p>
+              <p>4 Sogbon Street, Igbotako,<br />Ondo State, Nigeria.</p>
               <p>support@glossystore.com</p>
-              <p>+88015-88888-9999</p>
+              <p>+234 913 351 9489</p>
             </div>
           </div>
 

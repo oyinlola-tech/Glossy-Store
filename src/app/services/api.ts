@@ -1,6 +1,10 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
 const STORAGE_KEY = 'user';
-const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
+const REQUEST_TIMEOUT_MS = (() => {
+  const parsed = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
+  if (!Number.isFinite(parsed) || parsed < 1000) return 15000;
+  return parsed;
+})();
 
 type ApiRequestOptions = RequestInit & {
   requireAuth?: boolean;
@@ -54,6 +58,11 @@ const dispatchUnauthorized = () => {
   }
 };
 
+export const buildApiUrl = (endpoint: string): string => {
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${API_BASE_URL}${normalizedEndpoint}`;
+};
+
 async function apiCall<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
   const { requireAuth = false, ...requestOptions } = options;
   const includeJsonContentType = !(requestOptions.body instanceof FormData);
@@ -68,7 +77,7 @@ async function apiCall<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(`${API_BASE_URL}${normalizedEndpoint}`, {
+      const response = await fetch(buildApiUrl(normalizedEndpoint), {
         ...requestOptions,
         credentials: 'same-origin',
         signal: controller.signal,
