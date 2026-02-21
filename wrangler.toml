@@ -5,3 +5,13 @@ main = "worker/index.js"
 [assets]
 directory = "./dist"
 binding = "ASSETS"
+
+[vars]
+# Optional: set to your existing backend URL to proxy /api requests.
+# Example: "https://api.example.com"
+BACKEND_API_ORIGIN = ""
+
+[[d1_databases]]
+binding = "DB"
+database_name = "glossy-store"
+database_id = "71766b83-e2c4-42f3-ba69-26db5426c096"
