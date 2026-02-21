@@ -1,4 +1,4 @@
-name = "glossy-store-webapp"
+name = "glossy-store"
 compatibility_date = "2026-02-21"
 main = "worker/index.js"
 
